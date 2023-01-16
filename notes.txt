@@ -1,0 +1,42 @@
+Funktionsbeschreibung:
+
+-> Verfügbarkeit PV Strom - mehrere Möglichkeiten
+    *Inverter Auslesen
+    *Smartmeter Auslesen
+        -> Auslesen via Blink-Signal
+        -> Auslesen via SML (SmartMessageLanguage)
+-> Strompreis Berücksichtigen (Spotty Streaming Energy)
+
+
+Funktonsbeschreibung:
+https://www.goingelectric.de/wiki/Typ2-Signalisierung-und-Steckercodierung/
+
+CP (control pilot)
+PWM signal +-12 V, 1 KHz, Duty => erlaubter Ladestrom (Strom[A] = Duty [%] * 0.6)
+1. Initialzustand: kein PWM, sondern +12 V über 1K pullup
+2. Auto angeschlossen: Auto verbindet CP über diode und 2K7 an Erde -> Spannung CP sinkt auf +9 V
+3. Aktivierung PWM: PWM zw. +9 V und -12 V
+4. Auto ist bereit zum Laden: zusätzliche 1k3 auf Erde => obere PWM spannung sinkt auf +6 V
+5. Wallbox erkennt bereitwilligkeit zum Laden und schaltet Schütz frei.
+
+Auto fertig oder Abbruch: 1k3 wird weggeschalten => + 9V => Wallbox muss ausschalten!
+
+Zustandsbezeichnungen:
+Zustand CP-Spannung     Erklärung
+A       +12V            Fahrzeug getrennt
+B1      +9V             verbunden
+B2      PWM +9V -12V    Ladestation gibt Ladestrom bekannt
+C       PWM +6V -12V    Läd
+D       PWM +3V -12V    Lüftung angefordert
+E       0V              Verbindungsfehler
+F       -12V            Fehler
+
+PP (Proximity Pilot)
+gibt an wie stark das Ladekabel belastet werden darf:
+1K5     1.5 mm^2        13 A
+680     2.5 mm^2        20 A
+220     4-6 mm^2        32 A
+100     10-16 mm^2      63 A
+
+
+wählschalter für automatik und manuellen Modus (mit stromvorwahl)
