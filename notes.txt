@@ -39,4 +39,8 @@ gibt an wie stark das Ladekabel belastet werden darf:
 100     10-16 mm^2      63 A
 
 
-wählschalter für automatik und manuellen Modus (mit stromvorwahl)
+ATTINY1616:
+Internal clock läuft mit 20 MHz base freq. -> CPU mit 10 MHz (weil nur 3.3 V)
+Änderung auf 16 bzw. 8 MHz würde setzen von FUSEs erfordern.
+Damit PWM mit ~1 KHz läuft (Timer0A, Split-Mode 8bit) wird TCA0_SPLIT_HPER (counter reset)
+auf 158 begrenzt. (255 / 1000 * 617 Hz)
