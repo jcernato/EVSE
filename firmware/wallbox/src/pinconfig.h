@@ -6,33 +6,33 @@
 #define C 11
 #define D 12
 
-#define LED05 14
-#define LED10 15
-#define LED15 9
-#define LED20 8
-#define LED25 5
-#define LED30 4
-#define LED35 7
+#define LED12 14
+#define LED16 15
+#define LED20 1
+#define LED24 8
+#define LED28 5
+#define LED32 4
+#define LED36 6
 
 #define RELAIS 16
 #define ACCECK 0
-#define PWM 1
+#define PWM 9
 #define CPRead 2
 #define PPRead 3
 
-void pininit(void) {
+void pin_init(void) {
     pinMode(A, INPUT_PULLUP);    
     pinMode(B, INPUT_PULLUP);
     pinMode(C, INPUT_PULLUP);    
     pinMode(D, INPUT_PULLUP);
 
-    pinMode(LED05, OUTPUT);
-    pinMode(LED10, OUTPUT);
-    pinMode(LED15, OUTPUT);
+    pinMode(LED12, OUTPUT);
+    pinMode(LED16, OUTPUT);
     pinMode(LED20, OUTPUT);
-    pinMode(LED25, OUTPUT);
-    pinMode(LED30, OUTPUT);
-    // pinMode(LED35, OUTPUT);    
+    pinMode(LED24, OUTPUT);
+    pinMode(LED28, OUTPUT);
+    pinMode(LED32, OUTPUT);
+    pinMode(LED36, OUTPUT);    
 
     pinMode(RELAIS, OUTPUT);
     pinMode(ACCECK, INPUT);
@@ -41,8 +41,8 @@ void pininit(void) {
     pinMode(PPRead, INPUT);
 }
 
-byte LEDs[] = {LED05, LED10, LED15, LED20, LED25, LED30};
-uint16_t ladeleistungen[] = {500, 1000, 1500, 2000, 2500, 3000};
+byte LEDs[] = {LED12, LED16, LED20, LED24, LED28, LED32, LED36};
+uint16_t ladeleistungen[] = {1200, 1600, 2000, 2400, 2800, 3200, 3600};
 
 void toggle_LED(byte index) {
     for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], LOW);
