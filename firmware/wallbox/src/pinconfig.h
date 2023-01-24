@@ -19,6 +19,7 @@
 #define PWM 9
 #define CPRead 2
 #define PPRead 3
+#define RESET 17
 
 void pin_init(void) {
     pinMode(A, INPUT_PULLUP);    
