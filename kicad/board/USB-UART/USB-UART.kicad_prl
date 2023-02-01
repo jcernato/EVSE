@@ -1,8 +1,8 @@
 {
   "board": {
-    "active_layer": 49,
+    "active_layer": 44,
     "active_layer_preset": "",
-    "auto_track_width": true,
+    "auto_track_width": false,
     "hidden_nets": [],
     "high_contrast_mode": 0,
     "net_color_mode": 1,
@@ -62,11 +62,11 @@
       35,
       36
     ],
-    "visible_layers": "0025032_00000000",
+    "visible_layers": "7feff0f_80000001",
     "zone_display_mode": 0
   },
   "meta": {
-    "filename": "board.kicad_prl",
+    "filename": "USB-UART.kicad_prl",
     "version": 3
   },
   "project": {
