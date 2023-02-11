@@ -6,20 +6,20 @@
 #define C 11
 #define D 12
 
-#define LED12 14
-#define LED16 15
-#define LED20 1
-#define LED24 8
-#define LED28 5
-#define LED32 4
-#define LED36 6
+#define LED12 8
+#define LED16 6
+#define LED20 14
+#define LED24 4
+#define LED28 3
+#define LED32 1
+#define LED36 0
 
 #define RELAIS 16
-#define ACCECK 0
 #define PWM 9
 #define CPRead 2
-#define PPRead 3
+#define PPRead 5
 #define RESET 17
+#define ZAEHLER 15
 
 void pin_init(void) {
     pinMode(A, INPUT_PULLUP);    
@@ -36,10 +36,10 @@ void pin_init(void) {
     pinMode(LED36, OUTPUT);    
 
     pinMode(RELAIS, OUTPUT);
-    pinMode(ACCECK, INPUT);
     pinMode(PWM, OUTPUT);
     pinMode(CPRead, INPUT);
     pinMode(PPRead, INPUT);
+    pinMode(ZAEHLER, INPUT);
 }
 
 byte LEDs[] = {LED12, LED16, LED20, LED24, LED28, LED32, LED36};

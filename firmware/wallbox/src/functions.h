@@ -170,7 +170,7 @@ void _detected::run() {
   update();
 
   char buffer[30];
-  sprintf(buffer, "CPilot: H: %s V\tL: %s V\t%d\n", high.floatbuf, low.floatbuf, digitalRead(ACCECK));
+  sprintf(buffer, "CPilot: H: %s V\tL: %s V\n", high.floatbuf, low.floatbuf);
   Serial.print(buffer);
 
   if(lvolts > -4) {
@@ -203,7 +203,7 @@ void _charging::run() {
   update();
 
   char buffer[30];
-  sprintf(buffer, "CPilot: H: %s V\tL: %s V\t%d\n", high.floatbuf, low.floatbuf, digitalRead(ACCECK));
+  sprintf(buffer, "CPilot: H: %s V\tL: %s V\n", high.floatbuf, low.floatbuf);
   Serial.print(buffer);
 
   if(lvolts > -4) {

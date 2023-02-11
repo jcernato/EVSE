@@ -1,0 +1,22 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "PlatformIO",
+			"task": "Build (ATtiny1616)",
+			"problemMatcher": [
+				"$platformio"
+			],
+			"group": "build",
+			"label": "PlatformIO: Build (ATtiny1616)"
+		},
+		{
+			"type": "PlatformIO",
+			"task": "Upload (ATtiny1616)",
+			"problemMatcher": [
+				"$platformio"
+			],
+			"label": "PlatformIO: Upload (ATtiny1616)"
+		}
+	]
+}
