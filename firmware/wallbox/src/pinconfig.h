@@ -7,7 +7,7 @@
 #define D 12
 
 #define LED12 8
-#define LED16 6
+#define LED16 15
 #define LED20 14
 #define LED24 4
 #define LED28 3
@@ -17,9 +17,8 @@
 #define RELAIS 16
 #define PWM 9
 #define CPRead 2
-#define PPRead 5
+#define AUTOMATIK 5
 #define RESET 17
-#define ZAEHLER 15
 
 void pin_init(void) {
     pinMode(A, INPUT_PULLUP);    
@@ -38,14 +37,9 @@ void pin_init(void) {
     pinMode(RELAIS, OUTPUT);
     pinMode(PWM, OUTPUT);
     pinMode(CPRead, INPUT);
-    pinMode(PPRead, INPUT);
-    pinMode(ZAEHLER, INPUT);
+    pinMode(AUTOMATIK, INPUT);
 }
 
 byte LEDs[] = {LED12, LED16, LED20, LED24, LED28, LED32, LED36};
 uint16_t ladeleistungen[] = {1200, 1600, 2000, 2400, 2800, 3200, 3600};
 
-void toggle_LED(byte index) {
-    for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], LOW);
-    digitalWrite(LEDs[index], HIGH);
-}
