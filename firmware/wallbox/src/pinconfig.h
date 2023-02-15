@@ -41,5 +41,5 @@ void pin_init(void) {
 }
 
 byte LEDs[] = {LED12, LED16, LED20, LED24, LED28, LED32, LED36};
-uint16_t ladeleistungen[] = {1200, 1600, 2000, 2400, 2800, 3200, 3600};
+uint16_t ladeleistungen[] = {0, 1200, 1600, 2000, 2400, 2800, 3200, 3600, 0};
 

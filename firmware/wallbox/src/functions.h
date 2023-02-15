@@ -7,14 +7,15 @@
 #define PWM_LPER 158 // set counter reset to 158 => change PWM Frequency from 617 to 1000 Hz
 
 void toggle_LED(byte index) {
-    if(index < 0 || index > 6) {
+    if(index < 0 || index > 7) {
         Serial.print("Encoder ERROR");
         error.set();
         return;
     }
     for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], LOW);
-    digitalWrite(LEDs[index], HIGH);
+    if(index > 0) digitalWrite(LEDs[index-1], HIGH);
 }
+
 
 // input: leistung in W (max 3680) = 16 A * 230 V
 void set_pwm(uint16_t leistung) {
@@ -23,6 +24,7 @@ void set_pwm(uint16_t leistung) {
   //                   => Mindeststrom = 6 A (manchmal auch 4.8 A?)
   //                      1200 W ... 5.2 A mal schauen ob da eGolf damit ladet ...
   // https://www.goingelectric.de/wiki/Typ2-Signalisierung-und-Steckercodierung/
+  if(leistung == 0) return;
   if (leistung < 1200) {
     Serial.println("PWM value error!");
     error.set();
@@ -65,8 +67,8 @@ bool diode_fail(float messwert) {
     low.error_counter = 0;
     update();
 
-    if(enc == 7) automatic.set();
-    else toggle_LED(enc);
+    toggle_LED(enc);
+    if(enc == 0) return;
 
     if(check_CP(hvolts, STANDBY));
     else if(hvolts == -1) return;
@@ -78,7 +80,6 @@ bool diode_fail(float messwert) {
     Serial.println("Standby");
     digitalWrite(RELAIS, LOW);
     PWM_HIGH
-    toggle_LED(read_encoder());
     low.clear();
     while(digitalRead(RESET) == 0) delay(50);
   }
@@ -87,20 +88,18 @@ bool diode_fail(float messwert) {
 void _detected::set() {
   machine_state = &detected;
   Serial.println("Detected");
-  enc = read_encoder();
-  set_pwm(ladeleistungen[enc]);
   digitalWrite(RELAIS, LOW);
-  delay(100);
+  if(enc != 0) set_pwm(ladeleistungen[enc]);
 }
 void _detected::run() {
   if(!update()) return;
 
   DIODE_CHECK
 
-  if(enc == 7) automatic.set();
-  else { toggle_LED(enc);
-    set_pwm(ladeleistungen[enc]);
-  }
+  if(enc == 0) { standby.set(); return; }
+  toggle_LED(enc);
+  set_pwm(ladeleistungen[enc]);
+  
   if(check_CP(hvolts, DETECTED)) return;
   else if(check_CP(hvolts, STANDBY)) standby.set();
   else if(check_CP(hvolts, CHARGING)) charging.set();
@@ -112,17 +111,16 @@ void _charging::set() {
   machine_state = &charging;
   Serial.println("Charging");
   digitalWrite(RELAIS, HIGH);
-  delay(100);
 }
 void _charging::run() {
   if(!update()) return;
 
   DIODE_CHECK
 
-  if(enc == 7) automatic.set();
-  else { toggle_LED(enc);
-    set_pwm(ladeleistungen[enc]);
-  }
+  if(enc == 0) { standby.set(); return; }
+  toggle_LED(enc);
+  set_pwm(ladeleistungen[enc]);
+  
   if(check_CP(hvolts, CHARGING)) return;
   else if(check_CP(hvolts, STANDBY)) standby.set();
   else if(check_CP(hvolts, DETECTED)) detected.set();
@@ -147,18 +145,18 @@ void _charging::run() {
     }
   }
 
-// ################ AUTO no input ###################
-  void _automatic::set() {
-    machine_state = &automatic;
-    counter = 0;
-    Serial.println("Automatic mode, no input");
-    digitalWrite(RELAIS, LOW);
-    PWM_HIGH
-  }
-   void _automatic::run() {
-    byte enc = read_encoder();
-    if(enc < 7) standby.set();
-    toggle_LED(counter++);
-      if(counter == sizeof(LEDs)) counter = 0;
-  }
+// // ################ AUTO no input ###################
+//   void _automatic::set() {
+//     machine_state = &automatic;
+//     counter = 0;
+//     Serial.println("Automatic mode, no input");
+//     digitalWrite(RELAIS, LOW);
+//     PWM_HIGH
+//   }
+//    void _automatic::run() {
+//     byte enc = read_encoder();
+//     if(enc < 7) standby.set();
+//     toggle_LED(counter++);
+//       if(counter == sizeof(LEDs)) counter = 0;
+//   }
 

@@ -19,6 +19,7 @@ ISR(TCA0_LUNF_vect) {
   TCA0_SPLIT_INTFLAGS = TCA0_SPLIT_INTFLAGS | (0b00000010);
 }
 
+void(* resetFunc) (void) = 0;
 
 void setup() {
 
@@ -28,7 +29,16 @@ void setup() {
   TCA0_SPLIT_LPER = PWM_LPER; 
   ADC0_CTRLC = 0b01010000;
   TCA0_SPLIT_INTCTRL = 0b00010001;
+  for(byte i = 0; i < sizeof(LEDs); i++) {
+    digitalWrite(LEDs[i], HIGH);
+    delay(60);
+  }
   delay(200);
+  for(byte i = 0; i < sizeof(LEDs); i++) {
+    digitalWrite(LEDs[i], LOW);
+    delay(60);
+  }
+  delay(300);
   standby.set();
 }
 
@@ -45,17 +55,25 @@ void loop() {
     sprintf(buffer, "%s: H: %s V\tL: %s V", machine_state->name, high.floatbuf, low.floatbuf);
     Serial.println(buffer);
   }
-  // Serial.available();
-  // Serial.read();
+
   if(machine_state == &error) return;
   // only executed if state is not error
   if(high.error_counter > 5 || low.error_counter > 5) {
-    Serial.println("Messfehler");
+    Serial.print("Messfehler: ");
+    if(high.error_counter > 5) Serial.println("High");
+    if(low.error_counter > 5) Serial.println("Low");
     error.set();
   }
 
   if(digitalRead(RESET) == 0) {
     Serial.println("Manual error injecton");
+    byte i = 0;
+    delay(50);
+    while(digitalRead(RESET) == 0) {
+      delay(50);
+      i++;
+      if(i > 40) resetFunc();
+    }
     error.set();
   }
 }

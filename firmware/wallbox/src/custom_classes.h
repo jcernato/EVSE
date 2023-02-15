@@ -12,18 +12,39 @@ byte read_encoder() {
 
   byte wert = (a << 3) + (b << 2) + (c << 1) + d;
   switch(wert) {
-    case 0b1011: return 0;
-    case 0b0011: return 1;
-    case 0b0001: return 2;
-    case 0b1001: return 3;
-    case 0b1000: return 4;
-    case 0b1100: return 5;
-    case 0b1101: return 6;
-    case 0b1111: return 7;
+    case 0b1011: return 1;
+    case 0b0011: return 2;
+    case 0b0001: return 3;
+    case 0b1001: return 4;
+    case 0b1000: return 5;
+    case 0b1100: return 6;
+    case 0b1101: return 7;
+    case 0b1111: return 0;
     default: return 8;
   }
 }
 
+#define RX_BUFFSIZE 20
+uint16_t read_serial() {
+  char input_string[RX_BUFFSIZE];
+  byte index = 0;
+  if(!Serial.available()) return 0;
+  while(Serial.available()) {
+    char car = Serial.read();
+    input_string[index++] = car;
+    if(index > RX_BUFFSIZE) {
+      Serial.println("RX-Buffer full, terminate string with \\n");
+      return 0;
+    }
+    if(car == '\n')  {
+      input_string[index-1] = '\0';
+      int value = atoi(input_string);
+      if(value == 0) return 0xfe;
+      if(value < 0 || value > 3600) { Serial.println("Value out of range [0-3600] W"); return 0; }
+      else return value;
+    }
+  }
+}
 
 // ================ PEGEL ==================
 #define TOLERANZ 25
@@ -72,6 +93,8 @@ public:
 
 // ============== STATES =============
 extern pegel high, low;
+static byte enc = 0;
+unsigned long timestamp;
 
 class state {
 public:
@@ -79,13 +102,23 @@ public:
   virtual void set() = 0;
   virtual void run() = 0;
 
-  byte enc = 0;
   float hvolts = 0;
   float lvolts = 0;
   byte counter = 0;
 
   byte update() {
-    enc = read_encoder();
+    if(digitalRead(AUTOMATIK) == 0) {
+      uint16_t ser = read_serial();
+      if(ser != 0) {
+        timestamp = millis();
+        if(ser == 0xfe) enc = 0;
+        else for(byte i = 0; i < sizeof(ladeleistungen)/sizeof(uint16_t); i++) {
+          if(ser == ladeleistungen[i]) { enc = i; break; }
+        }
+      }
+      if(millis() - timestamp > 60000) enc = 0;
+    }
+    else enc = read_encoder();
     hvolts = high.spannung();
     lvolts = low.spannung();
     if(hvolts >= 0 && lvolts < 0) return 1;
@@ -145,4 +178,4 @@ _charging charging("Charging");
 // _ventilation ventilation("Ventilation");
 // _no_power no_power("No-Power");
 _error error("Error");
-_automatic automatic("Automatik");
+// _automatic automatic("Automatik");
