@@ -20,6 +20,8 @@ ISR(TCA0_LUNF_vect) {
 }
 
 void(* resetFunc) (void) = 0;
+#define INTERRUPTS_ON TCA0_SPLIT_INTCTRL = 0b00010001
+#define INTERRUPTS_OFF TCA0_SPLIT_INTCTRL = 0b00000000
 
 void setup() {
 
@@ -42,19 +44,23 @@ void setup() {
   standby.set();
 }
 
-byte lauf = 0;
 void loop() {
   // put your main code here, to run repeatedly:
-
+  INTERRUPTS_ON;
   delay(50);
+  INTERRUPTS_OFF;
+
+  read_serial();
+  
   machine_state->run();
 
-  if(lauf++ > 20) {
-    lauf = 0;
-    char buffer[30];
+  if(lauf++ == 0) {
+    char buffer[40];
     sprintf(buffer, "%s: H: %s V\tL: %s V", machine_state->name, high.floatbuf, low.floatbuf);
     Serial.println(buffer);
+    delay(50);
   }
+  if(lauf >= 50) lauf = 0;
 
   if(machine_state == &error) return;
   // only executed if state is not error

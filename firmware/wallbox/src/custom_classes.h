@@ -20,37 +20,56 @@ byte read_encoder() {
     case 0b1100: return 6;
     case 0b1101: return 7;
     case 0b1111: return 0;
-    default: return 8;
+    default: return 0;
   }
 }
 
-#define RX_BUFFSIZE 20
-uint16_t read_serial() {
-  char input_string[RX_BUFFSIZE];
+#define RX_BUFFSIZE 5
+char input_string[RX_BUFFSIZE];
+struct _serial_input {
+  bool force_auto = false;
+  uint16_t wert = 0;
+  unsigned long timestamp = 0;
+} serial_input;
+
+void read_serial() {
   byte index = 0;
-  if(!Serial.available()) return 0;
+  if(!Serial.available()) return;
   while(Serial.available()) {
-    char car = Serial.read();
-    input_string[index++] = car;
-    if(index > RX_BUFFSIZE) {
-      Serial.println("RX-Buffer full, terminate string with \\n");
-      return 0;
-    }
-    if(car == '\n')  {
-      input_string[index-1] = '\0';
-      int value = atoi(input_string);
-      if(value == 0) return 0xfe;
-      if(value < 0 || value > 3600) { Serial.println("Value out of range [0-3600] W"); return 0; }
-      else return value;
+    input_string[index++] = Serial.read();
+    if(index >= RX_BUFFSIZE) {
+      Serial.println("RX-Buffer full");
+      index = RX_BUFFSIZE - 1;
     }
   }
+
+  byte sum_msg = (input_string[0] + input_string[1] + input_string[2]) & 0xff;
+  byte cs = input_string[3];
+  if(sum_msg != cs) {
+    Serial.println("Checksum failed");
+    return;
+  }
+
+  serial_input.timestamp = 0;
+  serial_input.force_auto = false;
+  byte cmd = input_string[0];
+  switch(cmd) {
+    case 0xb4: break;
+    case 0xb5: serial_input.force_auto = true; break;
+    case 0xb6: Serial.println("Clear Error, not implemented"); break;
+    default: return;
+  }
+  byte wert1 = input_string[1];
+  byte wert0 = input_string[2];
+  serial_input.wert = (wert1 << 8) + wert0;
+  if(serial_input.wert < 1000 || serial_input.wert > 3600) Serial.println("Out of range [1000 - 3600]");
+  else { Serial.println("OK"); serial_input.timestamp = millis(); }
+  return;
 }
 
 // ================ PEGEL ==================
 #define TOLERANZ 25
 #define BUFFSIZE 10
-#define INTERRUPTS_ON TCA0_SPLIT_INTCTRL = 0b00010001
-#define INTERRUPTS_OFF TCA0_SPLIT_INTCTRL = 0b00000000
 
 class pegel {
 public:
@@ -58,7 +77,6 @@ public:
   byte index;
   byte error_counter = 0;
   int16_t mittelwert()  {
-    INTERRUPTS_OFF;
     int16_t summe = 0;
     int16_t min = 1023;
     int16_t max = 0;
@@ -67,7 +85,6 @@ public:
       if (messwerte[i] > max) max = messwerte[i];
       if (messwerte[i] < min) min = messwerte[i];
     }
-    INTERRUPTS_ON;
     if(abs(max - min) > TOLERANZ || summe < 10) { // Entweder zu hohe Spreizung der Messwerte (hohes Rauschen oder in Flanke gemessen), oder Wert zu gering bzw keine Messung erfolgt (kein pwm)
       error_counter++;
       return 0;
@@ -94,7 +111,6 @@ public:
 // ============== STATES =============
 extern pegel high, low;
 static byte enc = 0;
-unsigned long timestamp;
 
 class state {
 public:
@@ -107,18 +123,28 @@ public:
   byte counter = 0;
 
   byte update() {
-    if(digitalRead(AUTOMATIK) == 0) {
-      uint16_t ser = read_serial();
-      if(ser != 0) {
-        timestamp = millis();
-        if(ser == 0xfe) enc = 0;
-        else for(byte i = 0; i < sizeof(ladeleistungen)/sizeof(uint16_t); i++) {
-          if(ser == ladeleistungen[i]) { enc = i; break; }
-        }
+    pinMode(AUTOMATIK, INPUT);
+    delay(50);
+    bool automatik = false;
+    if(digitalRead(AUTOMATIK) == 0) automatik = true;
+    if(millis() - serial_input.timestamp < 300000 && serial_input.timestamp > 0) {
+      if((serial_input.wert >= 1000) && (serial_input.wert < (ladeleistungen[1] + ladeleistungen[2]) / 2)) enc = 1;
+      else if((serial_input.wert >= (ladeleistungen[1] + ladeleistungen[2]) / 2) && (serial_input.wert < (ladeleistungen[2] + ladeleistungen[3]) / 2)) enc = 2;
+      else if((serial_input.wert >= (ladeleistungen[2] + ladeleistungen[3]) / 2) && (serial_input.wert < (ladeleistungen[3] + ladeleistungen[4]) / 2)) enc = 3;
+      else if((serial_input.wert >= (ladeleistungen[3] + ladeleistungen[4]) / 2) && (serial_input.wert < (ladeleistungen[4] + ladeleistungen[5]) / 2)) enc = 4;
+      else if((serial_input.wert >= (ladeleistungen[4] + ladeleistungen[5]) / 2) && (serial_input.wert < (ladeleistungen[5] + ladeleistungen[6]) / 2)) enc = 5;
+      else if((serial_input.wert >= (ladeleistungen[5] + ladeleistungen[6]) / 2) && (serial_input.wert < (ladeleistungen[6] + ladeleistungen[7]) / 2)) enc = 6;
+      else if((serial_input.wert >= (ladeleistungen[6] + ladeleistungen[7]) / 2) && (serial_input.wert <= ladeleistungen[7])) enc = 7;
+      else enc = 0;
+      if(serial_input.force_auto == true) {
+        automatik = true;
+        pinMode(AUTOMATIK, OUTPUT);
+        digitalWrite(AUTOMATIK, LOW);
       }
-      if(millis() - timestamp > 60000) enc = 0;
     }
-    else enc = read_encoder();
+    else enc = 0;
+    if(!automatik) enc = read_encoder();
+
     hvolts = high.spannung();
     lvolts = low.spannung();
     if(hvolts >= 0 && lvolts < 0) return 1;

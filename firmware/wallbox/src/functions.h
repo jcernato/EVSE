@@ -60,6 +60,7 @@ bool diode_fail(float messwert) {
 #define BOGUS { high.error_counter++; }
 #define PWM_HIGH digitalWrite(PWM, LOW);
 #define PWM_LOW digitalWrite(PWM, HIGH);
+byte lauf = 0;
 
 // ################## STANDBY ####################
   void _standby::run() {
@@ -75,6 +76,7 @@ bool diode_fail(float messwert) {
     else if(check_CP(hvolts, DETECTED)) detected.set();
     else BOGUS;
   }
+
   void _standby::set() {
     machine_state = &standby;
     Serial.println("Standby");
@@ -82,6 +84,8 @@ bool diode_fail(float messwert) {
     PWM_HIGH
     low.clear();
     while(digitalRead(RESET) == 0) delay(50);
+    for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
+    lauf = 0;
   }
 
 // ################# DETECTED #######################
@@ -90,7 +94,10 @@ void _detected::set() {
   Serial.println("Detected");
   digitalWrite(RELAIS, LOW);
   if(enc != 0) set_pwm(ladeleistungen[enc]);
+  for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
+  lauf = 0;
 }
+
 void _detected::run() {
   if(!update()) return;
 
@@ -111,7 +118,10 @@ void _charging::set() {
   machine_state = &charging;
   Serial.println("Charging");
   digitalWrite(RELAIS, HIGH);
+  for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
+  lauf = 0;
 }
+
 void _charging::run() {
   if(!update()) return;
 
@@ -135,6 +145,8 @@ void _charging::run() {
     PWM_LOW
     for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
     while(digitalRead(RESET) == 0) delay(50);
+    lauf = 0;
+    
   }
   void _error::run() {
     if(digitalRead(RESET) == 0) {
@@ -144,19 +156,4 @@ void _charging::run() {
       standby.set();
     }
   }
-
-// // ################ AUTO no input ###################
-//   void _automatic::set() {
-//     machine_state = &automatic;
-//     counter = 0;
-//     Serial.println("Automatic mode, no input");
-//     digitalWrite(RELAIS, LOW);
-//     PWM_HIGH
-//   }
-//    void _automatic::run() {
-//     byte enc = read_encoder();
-//     if(enc < 7) standby.set();
-//     toggle_LED(counter++);
-//       if(counter == sizeof(LEDs)) counter = 0;
-//   }
 
