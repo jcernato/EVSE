@@ -111,6 +111,7 @@ public:
 // ============== STATES =============
 extern pegel high, low;
 static byte enc = 0;
+static uint16_t ladeleistung = 0;
 
 class state {
 public:
@@ -128,6 +129,7 @@ public:
     bool automatik = false;
     if(digitalRead(AUTOMATIK) == 0) automatik = true;
     if(millis() - serial_input.timestamp < 300000 && serial_input.timestamp > 0) {
+      ladeleistung = serial_input.wert;
       if((serial_input.wert >= 1000) && (serial_input.wert < (ladeleistungen[1] + ladeleistungen[2]) / 2)) enc = 1;
       else if((serial_input.wert >= (ladeleistungen[1] + ladeleistungen[2]) / 2) && (serial_input.wert < (ladeleistungen[2] + ladeleistungen[3]) / 2)) enc = 2;
       else if((serial_input.wert >= (ladeleistungen[2] + ladeleistungen[3]) / 2) && (serial_input.wert < (ladeleistungen[3] + ladeleistungen[4]) / 2)) enc = 3;
@@ -143,7 +145,10 @@ public:
       }
     }
     else enc = 0;
-    if(!automatik) enc = read_encoder();
+    if(!automatik) { 
+      enc = read_encoder();
+      ladeleistung = ladeleistungen[enc];
+    }
 
     hvolts = high.spannung();
     lvolts = low.spannung();

@@ -19,13 +19,14 @@ void toggle_LED(byte index) {
 
 // input: leistung in W (max 3680) = 16 A * 230 V
 void set_pwm(uint16_t leistung) {
+  if(enc == 0) return;
   // Duty cycle (in%) = Verfügbare Stromstärke (in A) ÷ 0,6 A   16 A entsprechen 27% duty
   // Gültiger Bereich: 10 % - 85 %
   //                   => Mindeststrom = 6 A (manchmal auch 4.8 A?)
   //                      1200 W ... 5.2 A mal schauen ob da eGolf damit ladet ...
   // https://www.goingelectric.de/wiki/Typ2-Signalisierung-und-Steckercodierung/
   if(leistung == 0) return;
-  if (leistung < 1200) {
+  if (leistung < 1000) {
     Serial.println("PWM value error!");
     error.set();
     return;
@@ -93,7 +94,7 @@ void _detected::set() {
   machine_state = &detected;
   Serial.println("Detected");
   digitalWrite(RELAIS, LOW);
-  if(enc != 0) set_pwm(ladeleistungen[enc]);
+  if(enc != 0) set_pwm(ladeleistung);
   for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
   lauf = 0;
 }
@@ -105,7 +106,7 @@ void _detected::run() {
 
   if(enc == 0) { standby.set(); return; }
   toggle_LED(enc);
-  set_pwm(ladeleistungen[enc]);
+  set_pwm(ladeleistung);
   
   if(check_CP(hvolts, DETECTED)) return;
   else if(check_CP(hvolts, STANDBY)) standby.set();
@@ -129,7 +130,7 @@ void _charging::run() {
 
   if(enc == 0) { standby.set(); return; }
   toggle_LED(enc);
-  set_pwm(ladeleistungen[enc]);
+  set_pwm(ladeleistung);
   
   if(check_CP(hvolts, CHARGING)) return;
   else if(check_CP(hvolts, STANDBY)) standby.set();
