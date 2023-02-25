@@ -62,7 +62,7 @@ void read_serial() {
   byte wert1 = input_string[1];
   byte wert0 = input_string[2];
   serial_input.wert = (wert1 << 8) + wert0;
-  if(serial_input.wert < 1000 || serial_input.wert > 3600) Serial.println("Out of range [1000 - 3600]");
+  if((serial_input.wert < 1000 && serial_input.wert != 0) || serial_input.wert > 3600) Serial.println("Out of range [1000 - 3600]");
   else { Serial.println("OK"); serial_input.timestamp = millis(); }
   return;
 }
@@ -94,7 +94,7 @@ public:
       return (summe - min - max) / 8;
     }
   }
-  char floatbuf[6];
+  char floatbuf[10];
   float spannung() { 
     float wert = mittelwert();
     if(wert == 0) return 0;
@@ -112,6 +112,7 @@ public:
 extern pegel high, low;
 static byte enc = 0;
 static uint16_t ladeleistung = 0;
+bool automatik = false;
 
 class state {
 public:
@@ -125,8 +126,8 @@ public:
 
   byte update() {
     pinMode(AUTOMATIK, INPUT);
+    automatik = false;
     delay(50);
-    bool automatik = false;
     if(digitalRead(AUTOMATIK) == 0) automatik = true;
     if(millis() - serial_input.timestamp < 300000 && serial_input.timestamp > 0) {
       ladeleistung = serial_input.wert;
