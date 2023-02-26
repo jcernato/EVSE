@@ -2,170 +2,127 @@
 
 #include <Arduino.h>
 #include "pinconfig.h"
-#include "custom_classes.h"
+
+
 
 #define PWM_LPER 158 // set counter reset to 158 => change PWM Frequency from 617 to 1000 Hz
+#define RX_BUFFSIZE 5
 
-void toggle_LED(byte index) {
-    if(index < 0 || index > 7) {
-        Serial.print("Encoder ERROR");
-        error.set();
-        return;
+void read_serial();
+void pin_init();
+
+struct _serial_input {
+  bool force_auto = false;
+  uint16_t wert = 0;
+  unsigned long timestamp = 0;
+};
+
+extern void(* resetFunc) (void);
+
+
+// ================ PEGEL ==================
+#define TOLERANZ 25
+#define BUFFSIZE 10
+
+class pegel {
+public:
+  int16_t messwerte[BUFFSIZE];
+  byte index;
+  byte error_counter = 0;
+  int16_t mittelwert()  {
+    int16_t summe = 0;
+    int16_t min = 1023;
+    int16_t max = 0;
+    for(byte i = 0; i < BUFFSIZE; i++) {
+      summe = summe + messwerte[i];
+      if (messwerte[i] > max) max = messwerte[i];
+      if (messwerte[i] < min) min = messwerte[i];
     }
-    for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], LOW);
-    if(index > 0) digitalWrite(LEDs[index-1], HIGH);
-}
-
-
-// input: leistung in W (max 3680) = 16 A * 230 V
-void set_pwm(uint16_t leistung) {
-  // Duty cycle (in%) = Verfügbare Stromstärke (in A) ÷ 0,6 A   16 A entsprechen 27% duty
-  // Gültiger Bereich: 10 % - 85 %
-  //                   => Mindeststrom = 6 A (manchmal auch 4.8 A?)
-  //                      1200 W ... 5.2 A mal schauen ob da eGolf damit ladet ...
-  // https://www.goingelectric.de/wiki/Typ2-Signalisierung-und-Steckercodierung/
-  if(leistung == 0) {
-    analogWrite(PWM, PWM_LPER+1);
-    digitalWrite(PWM, LOW);
-    return;
-  }
-  if (leistung < 1000) {
-    Serial.println("PWM value error!");
-    error.set();
-    return;
-  }
-  byte value = map(leistung, 0, 3600, 0, int(PWM_LPER*0.27));
-  if (leistung > 3680) {
-    Serial.println("PWM value error!");
-    error.set();
-    return;
-  }
-  analogWrite(PWM, PWM_LPER - value);  
-}
-
-#define STANDBY 12
-#define DETECTED 9
-#define CHARGING 6
-#define VENT 3
-
-bool check_CP(float messwert, float checkwert) {
-  #define HYST 1.0
-  if((messwert > checkwert - HYST) && messwert < checkwert + HYST) return true;
-  else return false;
-}
-bool diode_fail(float messwert) {
-  if(messwert > -4) {
-    Serial.println("Diode check failed");
-    return true;
-  }
-  else return false;
-}
-#define DIODE_CHECK if(diode_fail(lvolts)) { error.set(); return; }
-#define BOGUS { high.error_counter++; }
-#define PWM_LOW digitalWrite(PWM, HIGH);
-byte lauf = 0;
-
-// ################## STANDBY ####################
-  void _standby::run() {
-    // nur hvolts werden gemessen
-    low.error_counter = 0;
-    update();
-
-    toggle_LED(enc);
-    if(enc == 0 && automatik == false) return;
-
-    if(check_CP(hvolts, STANDBY));
-    else if(hvolts == -1) return;
-    else if(check_CP(hvolts, DETECTED)) detected.set();
-    else BOGUS;
-  }
-
-  void _standby::set() {
-    machine_state = &standby;
-    Serial.println("Standby");
-    digitalWrite(RELAIS, LOW);
-    set_pwm(0);
-    low.clear();
-    while(digitalRead(RESET) == 0) delay(50);
-    for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
-    lauf = 0;
-  }
-
-// ################# DETECTED #######################
-void _detected::set() {
-  machine_state = &detected;
-  Serial.println("Detected");
-  digitalWrite(RELAIS, LOW);
-  set_pwm(1200);
-  for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
-  lauf = 0;
-}
-
-void _detected::run() {
-  if(!update()) return;
-
-  DIODE_CHECK
-
-  toggle_LED(enc);
-  if(enc == 0) {
-    if(automatik) set_pwm(1200);
-    else standby.set(); return;
-    return;
-  }
-  else set_pwm(ladeleistung);
-  
-  if(check_CP(hvolts, DETECTED)) return;
-  else if(check_CP(hvolts, STANDBY)) standby.set();
-  else if(check_CP(hvolts, CHARGING)) charging.set();
-  else BOGUS
-}
-
-// ################## CHARGING #####################
-void _charging::set() {
-  machine_state = &charging;
-  Serial.println("Charging");
-  digitalWrite(RELAIS, HIGH);
-  for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
-  lauf = 0;
-}
-
-void _charging::run() {
-  if(!update()) return;
-
-  DIODE_CHECK
-
-  
-  if(enc == 0) {
-    if(automatik == false) standby.set();
-    else detected.set();
-    return;
-  }
-  toggle_LED(enc);
-  set_pwm(ladeleistung);
-  
-  if(check_CP(hvolts, CHARGING)) return;
-  else if(check_CP(hvolts, STANDBY)) standby.set();
-  else if(check_CP(hvolts, DETECTED)) detected.set();
-  else BOGUS
-}
-
-// ################### ERRROR #######################
-  void _error::set() {
-    machine_state = &error;
-    Serial.println("Error");
-    digitalWrite(RELAIS, LOW);
-    PWM_LOW
-    for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
-    while(digitalRead(RESET) == 0) delay(50);
-    lauf = 0;
-    
-  }
-  void _error::run() {
-    if(digitalRead(RESET) == 0) {
-      Serial.println("Error cleared");
-      high.error_counter = 0;
-      low.error_counter = 0;
-      standby.set();
+    if(abs(max - min) > TOLERANZ || summe < 10) { // Entweder zu hohe Spreizung der Messwerte (hohes Rauschen oder in Flanke gemessen), oder Wert zu gering bzw keine Messung erfolgt (kein pwm)
+      error_counter++;
+      return 0;
+    }
+    else {
+      error_counter = 0;
+      return (summe - min - max) / 8;
     }
   }
+  char floatbuf[10];
+  float spannung() { 
+    float wert = mittelwert();
+    if(wert == 0) return 0;
+    float volts = (wert - 350) / 50;
+    dtostrf(volts, 4, 1, floatbuf);
+    return volts;
+  }
+  void clear() {
+    for(byte i = 0; i < BUFFSIZE; i++) messwerte[i] = 0;
+    dtostrf(0, 4, 0, floatbuf);
+  }
+};
 
+// ============== STATES =============
+extern pegel high, low;
+static byte enc = 0;
+static uint16_t ladeleistung = 0;
+
+class state {
+public:
+  char *name;
+  char statusbezeichnung;
+  virtual void set() = 0;
+  virtual void run() = 0;
+
+  float hvolts = 0;
+  float lvolts = 0;
+  byte counter = 0;
+
+  byte update();
+
+};
+
+
+class _standby: public state {
+  public:
+  _standby(char *n, char g) { name = n; statusbezeichnung = g; }
+  void run();
+  void set();
+};
+class _detected: public state {
+  public:
+  _detected(char *n, char g) { name = n; statusbezeichnung = g; }
+  void run();
+  void set();
+};
+class _charging: public state {
+  public:
+  _charging(char *n, char g) { name = n; statusbezeichnung = g; }
+  void run();
+  void set();
+};
+// class _ventilation: public state {
+//   public:
+//   _ventilation(char *n, char g) { name = n; statusbezeichnung = g; }
+//   void run();
+//   void set();
+// };
+// class _no_power: public state {
+//   public:
+//   _no_power(char *n, char g) { name = n; statusbezeichnung = g; }
+//   void run();
+//   void set();
+// };
+class _error: public state {
+  public:
+  _error(char *n, char g) { name = n; statusbezeichnung = g; }
+  void run();
+  void set();
+};
+
+extern state *machine_state;
+extern _standby standby;
+extern _detected detected;
+extern _charging charging;
+extern _error error;
+
+extern byte LEDs[7];

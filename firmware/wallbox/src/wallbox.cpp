@@ -1,6 +1,5 @@
 #include <Arduino.h>
 
-#include "pinconfig.h"
 #include "functions.h"
 
 pegel high;
@@ -19,7 +18,6 @@ ISR(TCA0_LUNF_vect) {
   TCA0_SPLIT_INTFLAGS = TCA0_SPLIT_INTFLAGS | (0b00000010);
 }
 
-void(* resetFunc) (void) = 0;
 #define INTERRUPTS_ON TCA0_SPLIT_INTCTRL = 0b00010001
 #define INTERRUPTS_OFF TCA0_SPLIT_INTCTRL = 0b00000000
 
@@ -40,6 +38,21 @@ void setup() {
     digitalWrite(LEDs[i], LOW);
     delay(60);
   }
+  Serial.println("Wallbox:");
+  Serial.println("Befehlsstruktur: MagicNumber (Byte0), Payload(Byte 1&2), Checksum(Byte3)");
+  Serial.println("Checksum: (byte0 + byte1 + byte2) & 0xff");
+  Serial.println("Mögliche Befehle:");
+  Serial.println("'L': setze Ladeleistung für Automatik");
+  Serial.println("'F': Force -> erzwinge Automatik modus ");
+  Serial.println("'S': Statusanforderung");
+  Serial.println("     Antwort: 4 bytes:");
+  Serial.println("     Byte 0: 'S'");
+  Serial.println("     Byte 1: Wallboxstatus nach SAE_J1772 (A-E)");
+  Serial.println("     Byte 2: Modus (M...Manell, A...Automatik)");
+  Serial.println("     Byte 3 + 4: Ladeleistung");
+  Serial.println("     Byte 5: Checksum");
+  Serial.println("'V': Verbose - Statusname + gemessene Spannungen (CP)");
+  Serial.println("'R': Reset");
   delay(300);
   standby.set();
 }
@@ -51,16 +64,7 @@ void loop() {
   INTERRUPTS_OFF;
 
   read_serial();
-  
   machine_state->run();
-
-  if(lauf++ == 0) {
-    char buffer[40];
-    sprintf(buffer, "%s: H: %s V\tL: %s V", machine_state->name, high.floatbuf, low.floatbuf);
-    Serial.println(buffer);
-    delay(50);
-  }
-  if(lauf >= 50) lauf = 0;
 
   if(machine_state == &error) return;
   // only executed if state is not error

@@ -19,27 +19,3 @@
 #define CPRead 2
 #define AUTOMATIK 5
 #define RESET 17
-
-void pin_init(void) {
-    pinMode(A, INPUT_PULLUP);    
-    pinMode(B, INPUT_PULLUP);
-    pinMode(C, INPUT_PULLUP);    
-    pinMode(D, INPUT_PULLUP);
-
-    pinMode(LED12, OUTPUT);
-    pinMode(LED16, OUTPUT);
-    pinMode(LED20, OUTPUT);
-    pinMode(LED24, OUTPUT);
-    pinMode(LED28, OUTPUT);
-    pinMode(LED32, OUTPUT);
-    pinMode(LED36, OUTPUT);    
-
-    pinMode(RELAIS, OUTPUT);
-    pinMode(PWM, OUTPUT);
-    pinMode(CPRead, INPUT);
-    pinMode(AUTOMATIK, INPUT);
-}
-
-byte LEDs[] = {LED12, LED16, LED20, LED24, LED28, LED32, LED36};
-uint16_t ladeleistungen[] = {0, 1200, 1600, 2000, 2400, 2800, 3200, 3400};
-
