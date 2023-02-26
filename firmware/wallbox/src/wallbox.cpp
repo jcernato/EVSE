@@ -1,6 +1,7 @@
 #include <Arduino.h>
-
+#include <avr/wdt.h>
 #include "functions.h"
+
 
 pegel high;
 pegel low;
@@ -55,9 +56,12 @@ void setup() {
   Serial.println("'R': Reset");
   delay(300);
   standby.set();
+  wdt_enable(9); //  2s
 }
 
 void loop() {
+  wdt_reset();
+  while(digitalRead(RESET) == 0) delay(50);
   // put your main code here, to run repeatedly:
   INTERRUPTS_ON;
   delay(50);
@@ -77,13 +81,7 @@ void loop() {
 
   if(digitalRead(RESET) == 0) {
     Serial.println("Manual error injecton");
-    byte i = 0;
-    delay(50);
-    while(digitalRead(RESET) == 0) {
-      delay(50);
-      i++;
-      if(i > 40) resetFunc();
-    }
     error.set();
+    while(digitalRead(RESET) == 0) delay(50);
   }
 }

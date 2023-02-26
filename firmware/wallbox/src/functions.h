@@ -17,9 +17,6 @@ struct _serial_input {
   unsigned long timestamp = 0;
 };
 
-extern void(* resetFunc) (void);
-
-
 // ================ PEGEL ==================
 #define TOLERANZ 25
 #define BUFFSIZE 10

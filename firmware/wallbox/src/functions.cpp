@@ -83,6 +83,7 @@ void send_status() {
   msg[5] = cs;
   msg[6] = '\0';
   for(byte i = 0; i < 6; i++) Serial.print(msg[i]);
+  delay(50);
 }
 
 void send_verbose() {
@@ -109,14 +110,13 @@ void read_serial() {
     Serial.println("Checksum failed");
     return;
   }
-  serial_input.timestamp = millis();
   byte cmd = input_string[0];
   switch(cmd) {
-    case 'L': serial_input.force_auto = false; break;
-    case 'F': serial_input.force_auto = true; break;
+    case 'L': serial_input.force_auto = false; serial_input.timestamp = millis(); break;
+    case 'F': serial_input.force_auto = true; serial_input.timestamp = millis(); break;
     case 'S': send_status(); return;
     case 'V': send_verbose(); return;
-    case 'R': resetFunc();
+    case 'R': delay(2500); //resetFunc();
     default: serial_input.timestamp = 0; return;
   }
   byte wert1 = input_string[1];
@@ -231,8 +231,11 @@ void _standby::set() {
   digitalWrite(RELAIS, LOW);
   set_pwm(0);
   low.clear();
-  while(digitalRead(RESET) == 0) delay(50);
-  for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
+  if(digitalRead(RESET) == 0) {
+    for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], LOW);
+    while(digitalRead(RESET) == 0) delay(50);
+  }
+  else for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
 }
 
 // ################# DETECTED #######################
@@ -251,7 +254,10 @@ void _detected::run() {
 
   toggle_LED(enc);
   if(enc == 0) {
-    if(automatik) set_pwm(1200);
+    if(automatik) {
+      set_pwm(1200);
+      if(check_CP(hvolts, STANDBY)) standby.set();
+    }
     else standby.set();
     return;
   }
