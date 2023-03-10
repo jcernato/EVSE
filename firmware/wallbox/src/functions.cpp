@@ -126,7 +126,7 @@ void read_serial() {
     Serial.println("Out of range [1000 - 3600]");
     serial_input.timestamp = 0;
   }
-  else Serial.println("OK");
+  // else Serial.println("OK");
 }
 
 // input: leistung in W (max 3680) = 16 A * 230 V
@@ -159,8 +159,11 @@ byte state::update() {
   pinMode(AUTOMATIK, INPUT);
   automatik = false;
   delay(50);
-  if(digitalRead(AUTOMATIK) == 0) automatik = true;
-  if(millis() - serial_input.timestamp < 60000 && serial_input.timestamp > 0) {
+  if(digitalRead(AUTOMATIK) == 0) {
+    automatik = true;
+    serial_input.force_auto = false;
+  }
+  if(millis() - serial_input.timestamp < 300000 && serial_input.timestamp > 0) {
     ladeleistung = serial_input.wert;
     if((serial_input.wert >= 1000) && (serial_input.wert < (ladeleistungen[1] + ladeleistungen[2]) / 2)) enc = 1;
     else if((serial_input.wert >= (ladeleistungen[1] + ladeleistungen[2]) / 2) && (serial_input.wert < (ladeleistungen[2] + ladeleistungen[3]) / 2)) enc = 2;
@@ -175,8 +178,22 @@ byte state::update() {
       pinMode(AUTOMATIK, OUTPUT);
       digitalWrite(AUTOMATIK, LOW);
     }
+  } else if (serial_input.force_auto) {
+    if(digitalRead(AUTOMATIK) == 0) {
+      serial_input.force_auto = false;
+    }
+    else {
+      pinMode(AUTOMATIK, OUTPUT);
+      digitalWrite(AUTOMATIK, LOW);
+      automatik = true;
+      enc = 0;
+      delay(200);
+    }
+
+  } else {
+    enc = 0;    // zurücksetzen
   }
-  else enc = 0;
+
   if(!automatik) { 
     enc = read_encoder();
     ladeleistung = ladeleistungen[enc];
@@ -217,17 +234,18 @@ void _standby::run() {
   update();
 
   toggle_LED(enc);
-  if(enc == 0 && automatik == false) return;
+  // if(enc == 0) return;
 
-  if(check_CP(hvolts, STANDBY));
-  else if(hvolts == -1) return;
+  if(check_CP(hvolts, STANDBY)) return;
+  // else if(hvolts == -1) return;
   else if(check_CP(hvolts, DETECTED)) detected.set();
+  else if(check_CP(hvolts, CHARGING)) detected.set();
   else BOGUS;
 }
 
 void _standby::set() {
   machine_state = &standby;
-  Serial.println("Standby");
+  // Serial.println("Standby");
   digitalWrite(RELAIS, LOW);
   set_pwm(0);
   low.clear();
@@ -241,38 +259,37 @@ void _standby::set() {
 // ################# DETECTED #######################
 void _detected::set() {
   machine_state = &detected;
-  Serial.println("Detected");
+  // Serial.println("Detected");
   digitalWrite(RELAIS, LOW);
   set_pwm(1200);
   for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
 }
 
 void _detected::run() {
-  if(!update()) return;
-
-  DIODE_CHECK
-
-  toggle_LED(enc);
-  if(enc == 0) {
-    if(automatik) {
-      set_pwm(1200);
-      if(check_CP(hvolts, STANDBY)) standby.set();
-    }
-    else standby.set();
+  if(!update()) {
     return;
   }
-  else set_pwm(ladeleistung);
-  
+
+  DIODE_CHECK
+  toggle_LED(enc);
+
+  set_pwm(ladeleistung);
   if(check_CP(hvolts, DETECTED)) return;
   else if(check_CP(hvolts, STANDBY)) standby.set();
-  else if(check_CP(hvolts, CHARGING)) charging.set();
+  else if(check_CP(hvolts, CHARGING)) {
+    if(enc != 0) {
+      charging.set();
+    } else {
+      return;
+    }
+  }
   else BOGUS
 }
 
 // ################## CHARGING #####################
 void _charging::set() {
   machine_state = &charging;
-  Serial.println("Charging");
+  // Serial.println("Charging");
   digitalWrite(RELAIS, HIGH);
   for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
 }
@@ -280,20 +297,19 @@ void _charging::set() {
 void _charging::run() {
   if(!update()) return;
 
-  DIODE_CHECK
+  DIODE_CHECK 
+  toggle_LED(enc);
 
-  
   if(enc == 0) {
-    if(automatik == false) standby.set();
-    else detected.set();
+    detected.set();
     return;
   }
-  toggle_LED(enc);
+
   set_pwm(ladeleistung);
-  
   if(check_CP(hvolts, CHARGING)) return;
   else if(check_CP(hvolts, STANDBY)) standby.set();
   else if(check_CP(hvolts, DETECTED)) detected.set();
+  else if(check_CP(hvolts, VENT)) return; // FIXME: Ventilation status not implemented. Wenn dem Auto zu warm wird muss es selber damit klarkommen (runterregeln)
   else BOGUS
 }
 
