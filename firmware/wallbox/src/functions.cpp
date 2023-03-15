@@ -87,15 +87,15 @@ void send_status() {
 }
 
 void send_verbose() {
-    char buffer[40];
-    sprintf(buffer, "%s: H: %s V\tL: %s V", machine_state->name, high.floatbuf, low.floatbuf);
-    Serial.println(buffer);
+  // TODO: Implement!
     delay(50);
 }
 
 void read_serial() {
   byte index = 0;
-  if(!Serial.available()) return;
+  if(!Serial.available()) {
+    return;
+  }
   while(Serial.available()) {
     input_string[index++] = Serial.read();
     if(index >= RX_BUFFSIZE) {
@@ -112,12 +112,31 @@ void read_serial() {
   }
   byte cmd = input_string[0];
   switch(cmd) {
-    case 'L': serial_input.force_auto = false; serial_input.timestamp = millis(); break;
-    case 'F': serial_input.force_auto = true; serial_input.timestamp = millis(); break;
-    case 'S': send_status(); return;
-    case 'V': send_verbose(); return;
-    case 'R': delay(2500); //resetFunc();
-    default: serial_input.timestamp = 0; return;
+    case 'L': {
+      serial_input.force_auto = false;
+      serial_input.timestamp = millis();
+      break;
+    }
+    case 'F': {
+      serial_input.force_auto = true;
+      serial_input.timestamp = millis();
+      break;
+    }
+    case 'S': {
+      send_status();
+      return;
+    }
+    case 'V': {
+      send_verbose();
+      return;
+    }
+    case 'R': {
+      delay(2500); //resetFun();
+    }
+    default: {
+      serial_input.timestamp = 0;
+      return;
+    }
   }
   byte wert1 = input_string[1];
   byte wert0 = input_string[2];
@@ -126,7 +145,6 @@ void read_serial() {
     Serial.println("Out of range [1000 - 3600]");
     serial_input.timestamp = 0;
   }
-  // else Serial.println("OK");
 }
 
 // input: leistung in W (max 3680) = 16 A * 230 V
@@ -165,14 +183,23 @@ byte state::update() {
   }
   if(millis() - serial_input.timestamp < 300000 && serial_input.timestamp > 0) {
     ladeleistung = serial_input.wert;
-    if((serial_input.wert >= 1000) && (serial_input.wert < (ladeleistungen[1] + ladeleistungen[2]) / 2)) enc = 1;
-    else if((serial_input.wert >= (ladeleistungen[1] + ladeleistungen[2]) / 2) && (serial_input.wert < (ladeleistungen[2] + ladeleistungen[3]) / 2)) enc = 2;
-    else if((serial_input.wert >= (ladeleistungen[2] + ladeleistungen[3]) / 2) && (serial_input.wert < (ladeleistungen[3] + ladeleistungen[4]) / 2)) enc = 3;
-    else if((serial_input.wert >= (ladeleistungen[3] + ladeleistungen[4]) / 2) && (serial_input.wert < (ladeleistungen[4] + ladeleistungen[5]) / 2)) enc = 4;
-    else if((serial_input.wert >= (ladeleistungen[4] + ladeleistungen[5]) / 2) && (serial_input.wert < (ladeleistungen[5] + ladeleistungen[6]) / 2)) enc = 5;
-    else if((serial_input.wert >= (ladeleistungen[5] + ladeleistungen[6]) / 2) && (serial_input.wert < (ladeleistungen[6] + ladeleistungen[7]) / 2)) enc = 6;
-    else if((serial_input.wert >= (ladeleistungen[6] + ladeleistungen[7]) / 2) && (serial_input.wert <= ladeleistungen[7])) enc = 7;
-    else enc = 0;
+    if((serial_input.wert >= 1000) && (serial_input.wert < (ladeleistungen[1] + ladeleistungen[2]) / 2)) {
+      enc = 1;
+    } else if((serial_input.wert >= (ladeleistungen[1] + ladeleistungen[2]) / 2) && (serial_input.wert < (ladeleistungen[2] + ladeleistungen[3]) / 2)) {
+      enc = 2;
+    } else if((serial_input.wert >= (ladeleistungen[2] + ladeleistungen[3]) / 2) && (serial_input.wert < (ladeleistungen[3] + ladeleistungen[4]) / 2)) {
+      enc = 3;
+    } else if((serial_input.wert >= (ladeleistungen[3] + ladeleistungen[4]) / 2) && (serial_input.wert < (ladeleistungen[4] + ladeleistungen[5]) / 2)) {
+      enc = 4;
+    } else if((serial_input.wert >= (ladeleistungen[4] + ladeleistungen[5]) / 2) && (serial_input.wert < (ladeleistungen[5] + ladeleistungen[6]) / 2)) {
+      enc = 5;
+    } else if((serial_input.wert >= (ladeleistungen[5] + ladeleistungen[6]) / 2) && (serial_input.wert < (ladeleistungen[6] + ladeleistungen[7]) / 2)) {
+      enc = 6;
+    } else if((serial_input.wert >= (ladeleistungen[6] + ladeleistungen[7]) / 2) && (serial_input.wert <= ladeleistungen[7])) {
+      enc = 7;
+    } else {
+      enc = 0;
+    }
     if(serial_input.force_auto == true) {
       automatik = true;
       pinMode(AUTOMATIK, OUTPUT);
@@ -181,8 +208,7 @@ byte state::update() {
   } else if (serial_input.force_auto) {
     if(digitalRead(AUTOMATIK) == 0) {
       serial_input.force_auto = false;
-    }
-    else {
+    } else {
       pinMode(AUTOMATIK, OUTPUT);
       digitalWrite(AUTOMATIK, LOW);
       automatik = true;
@@ -201,8 +227,12 @@ byte state::update() {
 
   hvolts = high.spannung();
   lvolts = low.spannung();
-  if(hvolts >= 0 && lvolts < 0) return 1;
-  else return 0;
+
+  if(hvolts >= 0 && lvolts < 0) {
+    return 1;
+  } else {
+    return 0;
+  }
 }
 
 
@@ -210,22 +240,27 @@ byte state::update() {
 #define DETECTED 9
 #define CHARGING 6
 #define VENT 3
+#define HYST 1.0
 
 bool check_CP(float messwert, float checkwert) {
-  #define HYST 1.0
-  if((messwert > checkwert - HYST) && messwert < checkwert + HYST) return true;
-  else return false;
+  if((messwert > checkwert - HYST) && messwert < checkwert + HYST) {
+    return true;
+  } else {
+    return false;
+  }
 }
+
 bool diode_fail(float messwert) {
   if(messwert > -4) {
     Serial.println("Diode check failed");
     return true;
+  } else {
+    return false;
   }
-  else return false;
 }
+
 #define DIODE_CHECK if(diode_fail(lvolts)) { error.set(); return; }
-#define BOGUS { high.error_counter++; }
-#define PWM_LOW digitalWrite(PWM, HIGH);
+#define PWM_LOW digitalWrite(PWM, HIGH)
 
 // ################## STANDBY ####################
 void _standby::run() {
@@ -236,32 +271,35 @@ void _standby::run() {
   toggle_LED(enc);
   // if(enc == 0) return;
 
-  if(check_CP(hvolts, STANDBY)) return;
-  // else if(hvolts == -1) return;
-  else if(check_CP(hvolts, DETECTED)) detected.set();
-  else if(check_CP(hvolts, CHARGING)) detected.set();
-  else BOGUS;
+  if(check_CP(hvolts, STANDBY)) {
+    return;
+  } else if(check_CP(hvolts, DETECTED)) {
+    detected.set();
+  } else if(check_CP(hvolts, CHARGING)) {
+    detected.set();
+  } else {
+    high.error_counter++;
+  }
 }
 
 void _standby::set() {
   machine_state = &standby;
-  // Serial.println("Standby");
   digitalWrite(RELAIS, LOW);
   set_pwm(0);
   low.clear();
   if(digitalRead(RESET) == 0) {
     for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], LOW);
     while(digitalRead(RESET) == 0) delay(50);
+  } else {
+    for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
   }
-  else for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
 }
 
 // ################# DETECTED #######################
 void _detected::set() {
   machine_state = &detected;
-  // Serial.println("Detected");
   digitalWrite(RELAIS, LOW);
-  set_pwm(1200);
+  set_pwm(1234);
   for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
 }
 
@@ -273,29 +311,34 @@ void _detected::run() {
   DIODE_CHECK
   toggle_LED(enc);
 
-  set_pwm(ladeleistung);
-  if(check_CP(hvolts, DETECTED)) return;
-  else if(check_CP(hvolts, STANDBY)) standby.set();
-  else if(check_CP(hvolts, CHARGING)) {
+  if(check_CP(hvolts, DETECTED)) {
+    return;
+  } else if(check_CP(hvolts, STANDBY)) {
+    standby.set();
+  } else if(check_CP(hvolts, CHARGING)) {
     if(enc != 0) {
       charging.set();
     } else {
       return;
     }
+  } else {
+    high.error_counter++;
   }
-  else BOGUS
 }
 
 // ################## CHARGING #####################
 void _charging::set() {
   machine_state = &charging;
   // Serial.println("Charging");
+  set_pwm(ladeleistung);
   digitalWrite(RELAIS, HIGH);
   for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
 }
 
 void _charging::run() {
-  if(!update()) return;
+  if(!update()) {
+    return;
+  }
 
   DIODE_CHECK 
   toggle_LED(enc);
@@ -306,11 +349,18 @@ void _charging::run() {
   }
 
   set_pwm(ladeleistung);
-  if(check_CP(hvolts, CHARGING)) return;
-  else if(check_CP(hvolts, STANDBY)) standby.set();
-  else if(check_CP(hvolts, DETECTED)) detected.set();
-  else if(check_CP(hvolts, VENT)) return; // FIXME: Ventilation status not implemented. Wenn dem Auto zu warm wird muss es selber damit klarkommen (runterregeln)
-  else BOGUS
+  if(check_CP(hvolts, CHARGING)) {
+    return;
+  } else if(check_CP(hvolts, STANDBY)) {
+    standby.set();
+  } else if(check_CP(hvolts, DETECTED)) {
+    detected.set();
+  } else if(check_CP(hvolts, VENT)) {
+    // FIXME: Ventilation status not implemented. Wenn dem Auto zu warm wird muss es selber damit klarkommen (runterregeln)
+    return; 
+  } else {
+    high.error_counter++;
+  }
 }
 
 // ################### ERRROR #######################
@@ -318,7 +368,7 @@ void _error::set() {
   machine_state = &error;
   Serial.println("Error");
   digitalWrite(RELAIS, LOW);
-  PWM_LOW
+  PWM_LOW;
   for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
   while(digitalRead(RESET) == 0) delay(50);
   

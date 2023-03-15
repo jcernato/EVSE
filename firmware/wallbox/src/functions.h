@@ -26,6 +26,7 @@ public:
   int16_t messwerte[BUFFSIZE];
   byte index;
   byte error_counter = 0;
+
   int16_t mittelwert()  {
     int16_t summe = 0;
     int16_t min = 1023;
@@ -38,23 +39,23 @@ public:
     if(abs(max - min) > TOLERANZ || summe < 10) { // Entweder zu hohe Spreizung der Messwerte (hohes Rauschen oder in Flanke gemessen), oder Wert zu gering bzw keine Messung erfolgt (kein pwm)
       error_counter++;
       return 0;
-    }
-    else {
+    } else {
       error_counter = 0;
       return (summe - min - max) / 8;
     }
   }
-  char floatbuf[10];
+
   float spannung() { 
     float wert = mittelwert();
-    if(wert == 0) return 0;
+    if(wert == 0) {
+      return 0;
+    }
     float volts = (wert - 350) / 50;
-    dtostrf(volts, 4, 1, floatbuf);
     return volts;
   }
+  
   void clear() {
     for(byte i = 0; i < BUFFSIZE; i++) messwerte[i] = 0;
-    dtostrf(0, 4, 0, floatbuf);
   }
 };
 

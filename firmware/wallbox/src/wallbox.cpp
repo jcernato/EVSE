@@ -7,15 +7,21 @@ pegel high;
 pegel low;
 
 ISR(TCA0_LCMP0_vect) {
+  // Warte bis Spannung stabil (hohe input Widerstände + Inputkapazität -> Ladekurve)
   delayMicroseconds(50);
   low.messwerte[low.index++] = analogRead(CPRead);
-  if(low.index >= 10) low.index = 0;
+  if(low.index >= 10) {
+    low.index = 0;
+  }
   TCA0_SPLIT_INTFLAGS = TCA0_SPLIT_INTFLAGS | (0b00010000);
 }
 ISR(TCA0_LUNF_vect) {
+  // Warte bis Spannung stabil (hohe input Widerstände + Inputkapazität -> Ladekurve)
   delayMicroseconds(50);
   high.messwerte[high.index++] = analogRead(CPRead);
-  if(high.index >= 10) high.index = 0;
+  if(high.index >= 10) {
+    high.index = 0;
+  }
   TCA0_SPLIT_INTFLAGS = TCA0_SPLIT_INTFLAGS | (0b00000010);
 }
 
@@ -62,7 +68,8 @@ void setup() {
 void loop() {
   wdt_reset();
   while(digitalRead(RESET) == 0) delay(50);
-  // put your main code here, to run repeatedly:
+
+  // Messen
   INTERRUPTS_ON;
   delay(50);
   INTERRUPTS_OFF;
