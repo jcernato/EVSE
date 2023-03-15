@@ -53,7 +53,7 @@ public:
     float volts = (wert - 350) / 50;
     return volts;
   }
-  
+
   void clear() {
     for(byte i = 0; i < BUFFSIZE; i++) messwerte[i] = 0;
   }
@@ -67,12 +67,10 @@ static uint16_t ladeleistung = 0;
 class state {
 public:
   char *name;
-  char statusbezeichnung;
+  byte statusbezeichnung;
   virtual void set() = 0;
   virtual void run() = 0;
 
-  float hvolts = 0;
-  float lvolts = 0;
   byte counter = 0;
 
   byte update();

@@ -225,10 +225,7 @@ byte state::update() {
     ladeleistung = ladeleistungen[enc];
   }
 
-  hvolts = high.spannung();
-  lvolts = low.spannung();
-
-  if(hvolts >= 0 && lvolts < 0) {
+  if(high.spannung() >= 0 && low.spannung() < 0) {
     return 1;
   } else {
     return 0;
@@ -242,16 +239,16 @@ byte state::update() {
 #define VENT 3
 #define HYST 1.0
 
-bool check_CP(float messwert, float checkwert) {
-  if((messwert > checkwert - HYST) && messwert < checkwert + HYST) {
+bool check_CP(float checkwert) {
+  if((high.spannung() > checkwert - HYST) && high.spannung() < checkwert + HYST) {
     return true;
   } else {
     return false;
   }
 }
 
-bool diode_fail(float messwert) {
-  if(messwert > -4) {
+bool diode_fail() {
+  if(low.spannung() > -4) {
     Serial.println("Diode check failed");
     return true;
   } else {
@@ -259,7 +256,7 @@ bool diode_fail(float messwert) {
   }
 }
 
-#define DIODE_CHECK if(diode_fail(lvolts)) { error.set(); return; }
+#define DIODE_CHECK if(diode_fail()) { error.set(); return; }
 #define PWM_LOW digitalWrite(PWM, HIGH)
 
 // ################## STANDBY ####################
@@ -271,11 +268,11 @@ void _standby::run() {
   toggle_LED(enc);
   // if(enc == 0) return;
 
-  if(check_CP(hvolts, STANDBY)) {
+  if(check_CP(STANDBY)) {
     return;
-  } else if(check_CP(hvolts, DETECTED)) {
+  } else if(check_CP(DETECTED)) {
     detected.set();
-  } else if(check_CP(hvolts, CHARGING)) {
+  } else if(check_CP(CHARGING)) {
     detected.set();
   } else {
     high.error_counter++;
@@ -311,11 +308,11 @@ void _detected::run() {
   DIODE_CHECK
   toggle_LED(enc);
 
-  if(check_CP(hvolts, DETECTED)) {
+  if(check_CP(DETECTED)) {
     return;
-  } else if(check_CP(hvolts, STANDBY)) {
+  } else if(check_CP(STANDBY)) {
     standby.set();
-  } else if(check_CP(hvolts, CHARGING)) {
+  } else if(check_CP(CHARGING)) {
     if(enc != 0) {
       charging.set();
     } else {
@@ -349,13 +346,13 @@ void _charging::run() {
   }
 
   set_pwm(ladeleistung);
-  if(check_CP(hvolts, CHARGING)) {
+  if(check_CP(CHARGING)) {
     return;
-  } else if(check_CP(hvolts, STANDBY)) {
+  } else if(check_CP(STANDBY)) {
     standby.set();
-  } else if(check_CP(hvolts, DETECTED)) {
+  } else if(check_CP(DETECTED)) {
     detected.set();
-  } else if(check_CP(hvolts, VENT)) {
+  } else if(check_CP(VENT)) {
     // FIXME: Ventilation status not implemented. Wenn dem Auto zu warm wird muss es selber damit klarkommen (runterregeln)
     return; 
   } else {

@@ -10,7 +10,7 @@ ISR(TCA0_LCMP0_vect) {
   // Warte bis Spannung stabil (hohe input Widerstände + Inputkapazität -> Ladekurve)
   delayMicroseconds(50);
   low.messwerte[low.index++] = analogRead(CPRead);
-  if(low.index >= 10) {
+  if(low.index >= BUFFSIZE) {
     low.index = 0;
   }
   TCA0_SPLIT_INTFLAGS = TCA0_SPLIT_INTFLAGS | (0b00010000);
@@ -19,7 +19,7 @@ ISR(TCA0_LUNF_vect) {
   // Warte bis Spannung stabil (hohe input Widerstände + Inputkapazität -> Ladekurve)
   delayMicroseconds(50);
   high.messwerte[high.index++] = analogRead(CPRead);
-  if(high.index >= 10) {
+  if(high.index >= BUFFSIZE) {
     high.index = 0;
   }
   TCA0_SPLIT_INTFLAGS = TCA0_SPLIT_INTFLAGS | (0b00000010);
