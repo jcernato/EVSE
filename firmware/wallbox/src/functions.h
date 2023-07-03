@@ -2,30 +2,50 @@
 
 #include <Arduino.h>
 #include "pinconfig.h"
-
-
+#include "serial.h"
+#include "states.h"
 
 #define PWM_LPER 158 // set counter reset to 158 => change PWM Frequency from 617 to 1000 Hz
-#define RX_BUFFSIZE 5
+// default voltage levels
+#define STANDBY 12
+#define DETECTED 9
+#define CHARGING 6
+#define VENT 3
+#define HYST 1.0
 
-void read_serial();
+static byte enc = 0;
+static uint16_t ladeleistung = 0;
+static bool automatik = 0;
+static  bool pwm_active = 0;
+static uint16_t ladeleistungen[8] = {0, 1200, 1600, 2000, 2400, 2800, 3200, 3400};
+static byte LEDs[] = {LED12, LED16, LED20, LED24, LED28, LED32, LED36};
+
 void pin_init();
+byte read_encoder();
+void set_pwm(uint16_t leistung);
+void toggle_LED(byte index);
+bool check_CP(float checkwert);
+bool diode_fail();
+void init_splash();
 
-struct _serial_input {
-  bool force_auto = false;
-  uint16_t wert = 0;
-  unsigned long timestamp = 0;
-};
+#define DIODE_CHECK if(diode_fail()) { error.set(); return; }
 
-// ================ PEGEL ==================
+#define INTERRUPTS_ON TCA0_SPLIT_INTCTRL = 0b00010001
+#define INTERRUPTS_OFF TCA0_SPLIT_INTCTRL = 0b00000000
+
+// ========================================= //
+// ================ PEGEL ================== //
+// ========================================= //
 #define TOLERANZ 25
 #define BUFFSIZE 10
 
 class pegel {
+private:
+  float old_value;
 public:
+  byte error_counter = 0;
   int16_t messwerte[BUFFSIZE];
   byte index;
-  byte error_counter = 0;
 
   int16_t mittelwert()  {
     int16_t summe = 0;
@@ -36,22 +56,34 @@ public:
       if (messwerte[i] > max) max = messwerte[i];
       if (messwerte[i] < min) min = messwerte[i];
     }
+
     if(abs(max - min) > TOLERANZ || summe < 10) { // Entweder zu hohe Spreizung der Messwerte (hohes Rauschen oder in Flanke gemessen), oder Wert zu gering bzw keine Messung erfolgt (kein pwm)
       error_counter++;
-      return 0;
-    } else {
-      error_counter = 0;
-      return (summe - min - max) / 8;
-    }
+      if(error_counter < 5) {
+        return old_value;
+      } else {
+        return 0;
+      }
+    } 
+    
+    error_counter = 0;
+    old_value = (summe - min - max) / 8;
+    return old_value;
+  
   }
 
   float spannung() { 
-    float wert = mittelwert();
+    float wert = 0;
+    if(pwm_active) {
+      wert = mittelwert();
+    } else {
+      wert = analogRead(CPRead);
+    }
+
     if(wert == 0) {
       return 0;
     }
-    float volts = (wert - 350) / 50;
-    return volts;
+    return (wert - 350) / 50;
   }
 
   void clear() {
@@ -59,66 +91,4 @@ public:
   }
 };
 
-// ============== STATES =============
-extern pegel high, low;
-static byte enc = 0;
-static uint16_t ladeleistung = 0;
-
-class state {
-public:
-  char *name;
-  byte statusbezeichnung;
-  virtual void set() = 0;
-  virtual void run() = 0;
-
-  byte counter = 0;
-
-  byte update();
-
-};
-
-
-class _standby: public state {
-  public:
-  _standby(char *n, char g) { name = n; statusbezeichnung = g; }
-  void run();
-  void set();
-};
-class _detected: public state {
-  public:
-  _detected(char *n, char g) { name = n; statusbezeichnung = g; }
-  void run();
-  void set();
-};
-class _charging: public state {
-  public:
-  _charging(char *n, char g) { name = n; statusbezeichnung = g; }
-  void run();
-  void set();
-};
-// class _ventilation: public state {
-//   public:
-//   _ventilation(char *n, char g) { name = n; statusbezeichnung = g; }
-//   void run();
-//   void set();
-// };
-// class _no_power: public state {
-//   public:
-//   _no_power(char *n, char g) { name = n; statusbezeichnung = g; }
-//   void run();
-//   void set();
-// };
-class _error: public state {
-  public:
-  _error(char *n, char g) { name = n; statusbezeichnung = g; }
-  void run();
-  void set();
-};
-
-extern state *machine_state;
-extern _standby standby;
-extern _detected detected;
-extern _charging charging;
-extern _error error;
-
-extern byte LEDs[7];
+static pegel high, low;
