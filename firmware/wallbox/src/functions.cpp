@@ -20,6 +20,19 @@ ISR(TCA0_LUNF_vect) {
   TCA0_SPLIT_INTFLAGS = TCA0_SPLIT_INTFLAGS | (0b00000010);
 }
 
+void dbg(const char *text) {
+  if(DEBUG) Serial.print(text);
+}
+void dbgln(const char *text) {
+  if(DEBUG) Serial.println(text);
+}
+void dbg(const uint16_t value) {
+  if(DEBUG) Serial.print(value);
+}
+void dbgln(const uint16_t value) {
+  if(DEBUG) Serial.println(value);
+}
+
 void pin_init(void) {
     pinMode(A, INPUT_PULLUP);    
     pinMode(B, INPUT_PULLUP);
@@ -40,13 +53,23 @@ void pin_init(void) {
     pinMode(AUTOMATIK, INPUT);
 }
 
+void ALL_LEDs_ON(void) {
+  for(byte i = 0; i < sizeof(LEDs); i++) {
+    digitalWrite(LEDs[i], HIGH);
+  }
+}
+void ALL_LEDs_OFF(void) {
+  for(byte i = 0; i < sizeof(LEDs); i++) {
+    digitalWrite(LEDs[i], LOW);
+  }
+}
 void toggle_LED(byte index) {
     if(index < 0 || index > 7) {
         Serial.print("Encoder ERROR");
         error.set();
         return;
     }
-    for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], LOW);
+    ALL_LEDs_OFF();
     if(index > 0) digitalWrite(LEDs[index-1], HIGH);
 }
 
@@ -70,9 +93,30 @@ byte read_encoder() {
   }
 }
 
+byte calc_encoder(uint16_t wert) {
+  if((wert >= 1000) && (wert < (ladeleistungen[1] + ladeleistungen[2]) / 2)) {
+    return 1;
+  } else if((wert >= (ladeleistungen[1] + ladeleistungen[2]) / 2) && (wert < (ladeleistungen[2] + ladeleistungen[3]) / 2)) {
+    return 2;
+  } else if((wert >= (ladeleistungen[2] + ladeleistungen[3]) / 2) && (wert < (ladeleistungen[3] + ladeleistungen[4]) / 2)) {
+    return 3;
+  } else if((wert >= (ladeleistungen[3] + ladeleistungen[4]) / 2) && (wert < (ladeleistungen[4] + ladeleistungen[5]) / 2)) {
+    return 4;
+  } else if((wert >= (ladeleistungen[4] + ladeleistungen[5]) / 2) && (wert < (ladeleistungen[5] + ladeleistungen[6]) / 2)) {
+    return 5;
+  } else if((wert >= (ladeleistungen[5] + ladeleistungen[6]) / 2) && (wert < (ladeleistungen[6] + ladeleistungen[7]) / 2)) {
+    return 6;
+  } else if((wert >= (ladeleistungen[6] + ladeleistungen[7]) / 2) && (wert <= ladeleistungen[7])) {
+    return 7;
+  } else {
+    return 0;
+  }
+}
 
 // input: leistung in W (max 3680) = 16 A * 230 V
 void set_pwm(uint16_t leistung) {
+  dbg("Set PWM: ");
+  dbgln(leistung);
   // Duty cycle (in%) = Verfügbare Stromstärke (in A) ÷ 0,6 A   16 A entsprechen 27% duty
   // Gültiger Bereich: 10 % - 85 %
   //                   => Mindeststrom = 6 A (manchmal auch 4.8 A?)
@@ -81,9 +125,11 @@ void set_pwm(uint16_t leistung) {
   if(leistung == 0) {
     digitalWrite(PWM, HIGH); // inverted by driver stage (cmos inverter)
     pwm_active = false;
+    return;
   } else if(leistung == 1) {
-    digitalWrite(PWM, LOW);
+    digitalWrite(PWM, LOW);  // inverted by driver stage (cmos inverter)
     pwm_active = false;
+    return;
   } else if (leistung < 1000 || leistung > 3600) {
     Serial.println("PWM value error!");
     error.set();
@@ -126,24 +172,116 @@ void init_splash() {
   }
   delay(100);
 
-  Serial.println("Wallbox:");
-  Serial.println("Befehlsstruktur: MagicNumber (Byte0), Payload(Byte 1&2), Checksum(Byte3)");
-  Serial.println("Checksum: (byte0 + byte1 + byte2) & 0xff");
-  Serial.println("Mögliche Befehle:");
-  Serial.println("'L': setze Ladeleistung für Automatik");
-  Serial.println("'F': Force -> erzwinge Automatik modus ");
-  Serial.println("'S': Statusanforderung");
-  Serial.println("     Antwort: 4 bytes:");
-  Serial.println("     Byte 0: 'S'");
-  Serial.println("     Byte 1: Wallboxstatus nach SAE_J1772 (A-E)");
-  Serial.println("     Byte 2: Modus (M...Manell, A...Automatik)");
-  Serial.println("     Byte 3 + 4: Ladeleistung");
-  Serial.println("     Byte 5: Checksum");
-  Serial.println("'V': Verbose - Statusname + gemessene Spannungen (CP)");
-  Serial.println("'R': Reset");
+  if(digitalRead(RESET) == 0) DEBUG = true;
+
+  dbgln("DEBUG MODE");
+  dbgln("Wallbox:");
+  dbgln("Befehlsstruktur: MagicNumber (Byte0), Payload(Byte 1&2), Checksum(Byte3)");
+  dbgln("Checksum: (byte0 + byte1 + byte2) & 0xff");
+  dbgln("Mögliche Befehle:");
+  dbgln("'L': setze Ladeleistung für Automatik");
+  dbgln("'F': Force -> erzwinge Automatik modus ");
+  dbgln("'S': Statusanforderung");
+  dbgln("     Antwort: 4 bytes:");
+  dbgln("     Byte 0: 'S'");
+  dbgln("     Byte 1: Wallboxstatus nach SAE_J1772 (A-E)");
+  dbgln("     Byte 2: Modus (M...Manell, A...Automatik)");
+  dbgln("     Byte 3 + 4: Ladeleistung");
+  dbgln("     Byte 5: Checksum");
+  dbgln("'V': Verbose - Statusname + gemessene Spannungen (CP)");
+  dbgln("'R': Reset");
 
   for(byte i = 0; i < sizeof(LEDs); i++) {
     digitalWrite(LEDs[i], LOW);
     delay(60);
   }
+}
+
+void update() {
+  // set automatik pin to input and read state
+  pinMode(AUTOMATIK, INPUT);
+  delay(10);
+  if(digitalRead(AUTOMATIK) == 0) {
+    automatik = true;
+    serial_input.force_auto = false;
+  } else {
+    automatik = false;
+  }
+
+  // if serial data is outdated
+  if(millis() - serial_input.timestamp > 300000 || serial_input.timestamp == 0) {
+    if(automatik) {
+      enc = 0;
+    } else {
+      enc = read_encoder();
+    }
+    ladeleistung = ladeleistungen[enc];
+    return;
+  }
+
+  // serial data valid
+  if(serial_input.force_auto) {
+    automatik = true;
+    pinMode(AUTOMATIK, OUTPUT);
+    digitalWrite(AUTOMATIK, LOW);
+    delay(200); // FIXME: nicht schön!
+  }
+
+  // manual mode
+  if(!automatik) {
+    enc = read_encoder();
+    ladeleistung = ladeleistungen[enc];
+    return;
+  }
+
+  ladeleistung = serial_input.wert;
+  enc = calc_encoder(ladeleistung);
+}
+
+
+int16_t pegel::mittelwert() {
+  int16_t summe = 0;
+  int16_t min = 1023;
+  int16_t max = 0;
+  for(byte i = 0; i < BUFFSIZE; i++) {
+    summe = summe + messwerte[i];
+    if (messwerte[i] > max) max = messwerte[i];
+    if (messwerte[i] < min) min = messwerte[i];
+  }
+
+  if(abs(max - min) > TOLERANZ || summe < 10) { // Entweder zu hohe Spreizung der Messwerte (hohes Rauschen oder in Flanke gemessen), oder Wert zu gering bzw keine Messung erfolgt (kein pwm)
+    error_counter++;
+    if(error_counter < 5) {
+      return old_value;
+    } else {
+      dbgln("Error measurement error_count");
+      error.set();
+      return 0;
+    }
+  } 
+  
+  error_counter = 0;
+  old_value = (summe - min - max) / (BUFFSIZE-2); // entferne min und max (Ausreißer)
+  return old_value;
+}
+
+float adc2float(uint16_t val) {
+  int a = val;
+  return (a - 350) / 50;
+}
+
+float pegel::spannung() { 
+  uint16_t wert = 0;
+  if(pwm_active) {
+    wert = mittelwert();
+  } else {
+    wert = analogRead(CPRead);
+  }
+
+  if(wert == 0) {
+    dbgln("Measurement error!");
+    error.set();
+    return 0;
+  }
+  return adc2float(wert);
 }

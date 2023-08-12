@@ -3,27 +3,54 @@
 static char input_string[RX_BUFFSIZE];
 
 void send_status() {
-  char msg[10];
-  char magic = 'S';
+  char msg[16];
+  char magic = '$';
   char autom, cs;
   if(automatik) autom = 'A';
   else autom = 'M';
+  bool pwm = pwm_active;
+  union {
+    float wert;
+    byte bytes[4];
+  } fl;
   msg[0] = magic;
   msg[1] = machine_state->statusbezeichnung;
   msg[2] = autom;
-  msg[3] = ladeleistung >> 8;
-  msg[4] = ladeleistung & 0xff;
-  cs = (msg[0] + msg[1] + msg[2] + msg[3] + msg[4]) & 0xff;
-  msg[5] = cs;
-  msg[6] = '\0';
-  for(byte i = 0; i < 6; i++) Serial.print(msg[i]);
+  msg[3] = pwm;
+  msg[4] = ladeleistung >> 8;
+  msg[5] = ladeleistung & 0xff;
+  fl.wert = high.spannung();
+  for(byte i = 0; i < 4; i++) msg[i+6] = fl.bytes[i];
+  fl.wert = low.spannung();
+  for(byte i = 0; i < 4; i++) msg[i+10] = fl.bytes[i];
+  unsigned int sum = 0;
+  for(byte i = 0; i < 14; i++) sum = sum + msg[i];
+  cs = sum & 0xff;
+  msg[14] = cs;
+  msg[15] = '#';
+  for(byte i = 0; i < 16; i++) Serial.print(msg[i]);
   Serial.flush();
   delay(50);
 }
 
 void send_verbose() {
-  // TODO: Implement!
-    delay(50);
+  union {
+    float wert;
+    byte bytes[4];
+  } fl;
+  float a = -1.234;
+  float b = adc2float(500);
+  float c = adc2float(123);
+  fl.wert = a;
+  for(byte i=0; i<4; i++) Serial.print(fl.bytes[i], HEX);
+  Serial.println();
+  fl.wert = b;
+  for(byte i=0; i<4; i++) Serial.print(fl.bytes[i], HEX);
+  Serial.println();
+  fl.wert = c;
+  for(byte i=0; i<4; i++) Serial.print(fl.bytes[i], HEX);
+  Serial.println();
+  delay(50);
 }
 
 void read_serial() {
@@ -32,9 +59,9 @@ void read_serial() {
     return;
   }
   while(Serial.available()) {
-    input_string[index++] = Serial.read();
+    char c = Serial.read();
+    input_string[index++] = c;
     if(index >= RX_BUFFSIZE) {
-      Serial.println("RX-Buffer full");
       index = RX_BUFFSIZE - 1;
     }
   }
@@ -42,7 +69,7 @@ void read_serial() {
   byte sum_msg = (input_string[0] + input_string[1] + input_string[2]) & 0xff;
   byte cs = input_string[3];
   if(sum_msg != cs) {
-    Serial.println("Checksum failed");
+    Serial.println("WB: Checksum failed");
     return;
   }
   byte cmd = input_string[0];
@@ -77,7 +104,7 @@ void read_serial() {
   byte wert0 = input_string[2];
   serial_input.wert = (wert1 << 8) + wert0;
   if((serial_input.wert < 1000 && serial_input.wert != 0) || serial_input.wert > 3600) {
-    Serial.println("Out of range [1000 - 3600]");
+    Serial.println("WB: Out of range [1000 - 3600]");
     serial_input.timestamp = 0;
   }
 }

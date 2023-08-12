@@ -1,95 +1,49 @@
 #include "states.h"
 
-byte state::update() {
-  pinMode(AUTOMATIK, INPUT);
-  automatik = false;
-  delay(10);
-  if(digitalRead(AUTOMATIK) == 0) {
-    automatik = true;
-    serial_input.force_auto = false;
-  }
-  if(millis() - serial_input.timestamp < 300000 && serial_input.timestamp > 0) {
-    ladeleistung = serial_input.wert;
-    if((serial_input.wert >= 1000) && (serial_input.wert < (ladeleistungen[1] + ladeleistungen[2]) / 2)) {
-      enc = 1;
-    } else if((serial_input.wert >= (ladeleistungen[1] + ladeleistungen[2]) / 2) && (serial_input.wert < (ladeleistungen[2] + ladeleistungen[3]) / 2)) {
-      enc = 2;
-    } else if((serial_input.wert >= (ladeleistungen[2] + ladeleistungen[3]) / 2) && (serial_input.wert < (ladeleistungen[3] + ladeleistungen[4]) / 2)) {
-      enc = 3;
-    } else if((serial_input.wert >= (ladeleistungen[3] + ladeleistungen[4]) / 2) && (serial_input.wert < (ladeleistungen[4] + ladeleistungen[5]) / 2)) {
-      enc = 4;
-    } else if((serial_input.wert >= (ladeleistungen[4] + ladeleistungen[5]) / 2) && (serial_input.wert < (ladeleistungen[5] + ladeleistungen[6]) / 2)) {
-      enc = 5;
-    } else if((serial_input.wert >= (ladeleistungen[5] + ladeleistungen[6]) / 2) && (serial_input.wert < (ladeleistungen[6] + ladeleistungen[7]) / 2)) {
-      enc = 6;
-    } else if((serial_input.wert >= (ladeleistungen[6] + ladeleistungen[7]) / 2) && (serial_input.wert <= ladeleistungen[7])) {
-      enc = 7;
-    } else {
-      enc = 0;
-    }
-    if(serial_input.force_auto) {
-      automatik = true;
-      pinMode(AUTOMATIK, OUTPUT);
-      digitalWrite(AUTOMATIK, LOW);
-    }
-  } else if (serial_input.force_auto) {
-    if(digitalRead(AUTOMATIK) == 0) {
-      serial_input.force_auto = false;
-    } else {
-      pinMode(AUTOMATIK, OUTPUT);
-      digitalWrite(AUTOMATIK, LOW);
-      automatik = true;
-      enc = 0;
-      delay(200);
-    }
+static state *machine_state;
 
-  } else {
-    enc = 0;    // zurücksetzen
-  }
-
-  if(!automatik) { 
-    enc = read_encoder();
-    ladeleistung = ladeleistungen[enc];
-  }
-
-  if(high.spannung() >= 0 && low.spannung() < 0) {
-    return 1;
-  } else {
-    return 0;
-  }
+void state::set(void) {
+  machine_state = this;
+  dbg("Set state: ");
+  dbgln(name);
+  set_individual();
 }
+
+
 
 // ######################################## //
 // ################## OFF ################# //
 // ################## SET ################# //
-void _off::set() {
-  machine_state = &off;
+void _off::set_individual() {
   digitalWrite(RELAIS, LOW);
   set_pwm(0);
+  ALL_LEDs_ON();
 }
 
 // ################## OFF ################# //
 // ################## RUN ################# //
 void _off::run() {
-    update();
-    if(enc == 0) return;
-    DIODE_CHECK
-    return;
+   update();
+    toggle_LED(enc);
+    if(enc == 0) {
+      return;
+    } else {
+      standby.set();
+    }
 }
 
 // ######################################## //
 // ################ STANDBY ############### //
 // ################## SET ################# //
-void _standby::set() {
-  machine_state = &standby;
+void _standby::set_individual() {
   digitalWrite(RELAIS, LOW);
-  set_pwm(0);
+  set_pwm(1);
   low.clear();
   if(digitalRead(RESET) == 0) {
-    for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], LOW);
+    ALL_LEDs_OFF();
     while(digitalRead(RESET) == 0) delay(50);
   } else {
-    for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
+    ALL_LEDs_ON();
   }
 }
 
@@ -100,7 +54,10 @@ void _standby::run() {
   update();
 
   toggle_LED(enc);
-  // if(enc == 0) return;
+  if(enc == 0) {
+    off.set();
+    return;
+  }
 
   if(check_CP(STANDBY)) {
     return;
@@ -113,22 +70,23 @@ void _standby::run() {
 // ######################################## //
 // ################ DETECTED ############## //
 // ################## SET ################# //
-void _detected::set() {
-  machine_state = &detected;
+void _detected::set_individual() {
   digitalWrite(RELAIS, LOW);
   set_pwm(2345);
-  for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
+  ALL_LEDs_ON();
 }
 
 // ################ DETECTED ############## //
 // ################## RUN ################# //
 void _detected::run() {
-  if(!update()) {
-    return;
-  }
+  update();
 
   DIODE_CHECK
   toggle_LED(enc);
+  if(enc == 0) {
+    off.set();
+    return;
+  }
 
   if(check_CP(DETECTED)) {
     return;
@@ -146,25 +104,20 @@ void _detected::run() {
 // ######################################## //
 // ############### CHARGING ############### //
 // ################## SET ################# //
-void _charging::set() {
-  machine_state = &charging;
-  // Serial.println("Charging");
+void _charging::set_individual() {
   set_pwm(ladeleistung);
   digitalWrite(RELAIS, HIGH);
-  for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
+  ALL_LEDs_ON();
 }
 // ############### CHARGING ############### //
 // ################## RUN ################# //
 void _charging::run() {
-  if(!update()) {
-    return;
-  }
+  update();
 
   DIODE_CHECK 
   toggle_LED(enc);
-
   if(enc == 0) {
-    detected.set();
+    off.set();
     return;
   }
 
@@ -185,14 +138,12 @@ void _charging::run() {
 // ######################################## //
 // ################# ERRROR ############### //
 // ################## SET ################# //
-void _error::set() {
-  machine_state = &error;
-  Serial.println("Error");
+void _error::set_individual() {
   digitalWrite(RELAIS, LOW);
   set_pwm(0);
   high.error_counter = 0;
   low.error_counter = 0;
-  for(byte i = 0; i < sizeof(LEDs); i++) digitalWrite(LEDs[i], HIGH);
+  ALL_LEDs_ON();
   while(digitalRead(RESET) == 0) delay(50);
   
 }

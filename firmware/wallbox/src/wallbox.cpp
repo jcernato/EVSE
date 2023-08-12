@@ -35,7 +35,7 @@ void loop() {
   machine_state->run();
 
   if(digitalRead(RESET) == 0) {
-    Serial.println("Manual error injecton");
+    dbgln("Manual error injecton");
     error.set();
     while(digitalRead(RESET) == 0) delay(50);
   }

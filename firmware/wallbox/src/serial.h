@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Arduino.h>
-#include "pinconfig.h"
 #include "functions.h"
 #include "states.h"
 
