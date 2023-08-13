@@ -13,11 +13,11 @@
 #define VENT 3
 #define HYST 1.25
 
-static bool DEBUG = false;
-static byte enc = 0;
-static uint16_t ladeleistung = 0;
-static bool automatik = 0;
-static bool pwm_active = 0;
+extern bool DEBUG;
+extern byte enc;
+extern uint16_t ladeleistung;
+extern bool automatik;
+extern bool pwm_active;
 static uint16_t ladeleistungen[8] = {0, 1200, 1600, 2000, 2400, 2800, 3200, 3400};
 static byte LEDs[] = {LED12, LED16, LED20, LED24, LED28, LED32, LED36};
 
@@ -35,6 +35,7 @@ void update();
 void ALL_LEDs_ON(void);
 void ALL_LEDs_OFF(void);
 float adc2float(uint16_t val);
+void set_ladeleistung(uint16_t val);
 
 #define DIODE_CHECK if(diode_fail()) { error.set(); return; }
 
@@ -62,4 +63,4 @@ public:
   }
 };
 
-static pegel high, low;
+extern pegel high, low;

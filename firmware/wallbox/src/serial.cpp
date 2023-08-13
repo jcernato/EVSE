@@ -1,6 +1,7 @@
 #include "serial.h"
 
 static char input_string[RX_BUFFSIZE];
+_serial_input serial_input;
 
 void send_status() {
   char msg[16];
@@ -58,6 +59,7 @@ void read_serial() {
   if(!Serial.available()) {
     return;
   }
+  delay(20);
   while(Serial.available()) {
     char c = Serial.read();
     input_string[index++] = c;
@@ -68,6 +70,7 @@ void read_serial() {
 
   byte sum_msg = (input_string[0] + input_string[1] + input_string[2]) & 0xff;
   byte cs = input_string[3];
+  dbg("Received data: ");
   if(sum_msg != cs) {
     Serial.println("WB: Checksum failed");
     return;
@@ -75,27 +78,32 @@ void read_serial() {
   byte cmd = input_string[0];
   switch(cmd) {
     case 'L': {
+      dbgln("Set Ladeleistung");
       serial_input.force_auto = false;
       serial_input.timestamp = millis();
       break;
     }
     case 'F': {
+      dbgln("Force Ladeleistung");
       serial_input.force_auto = true;
       serial_input.timestamp = millis();
       break;
     }
     case 'S': {
+      dbgln("Request Status");
       send_status();
       return;
     }
-    case 'V': {
-      send_verbose();
-      return;
-    }
+    // case 'V': {
+    //   send_verbose();
+    //   return;
+    // }
     case 'R': {
+      dbgln("Reset");
       delay(2500); //resetFun();
     }
     default: {
+      dbgln("Unknown");
       serial_input.timestamp = 0;
       return;
     }

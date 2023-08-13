@@ -2,6 +2,12 @@
 #include "functions.h"
 
 void(* resetFunc) (void) = 0;
+bool DEBUG = false;
+byte enc = 0;
+uint16_t ladeleistung = 0;
+bool automatik = 0;
+bool pwm_active = 0;
+pegel high, low;
 
 ISR(TCA0_LCMP0_vect) {
   delayMicroseconds(50); // Warte bis Spannung stabil (hohe input Widerstände + Inputkapazität -> Ladekurve)
@@ -113,10 +119,20 @@ byte calc_encoder(uint16_t wert) {
   }
 }
 
+void set_ladeleistung(uint16_t leistung) {
+  if(leistung != ladeleistung) {
+    dbg("Ladeleistung: ");
+    dbgln(leistung);
+  }
+  ladeleistung = leistung;
+}
+
 // input: leistung in W (max 3680) = 16 A * 230 V
 void set_pwm(uint16_t leistung) {
-  dbg("Set PWM: ");
-  dbgln(leistung);
+  if(leistung != ladeleistung) {
+    dbg("Set PWM: ");
+    dbgln(leistung);
+  }
   // Duty cycle (in%) = Verfügbare Stromstärke (in A) ÷ 0,6 A   16 A entsprechen 27% duty
   // Gültiger Bereich: 10 % - 85 %
   //                   => Mindeststrom = 6 A (manchmal auch 4.8 A?)
@@ -152,7 +168,7 @@ bool check_CP(float checkwert) {
 }
 
 bool diode_fail() {
-  if(low.spannung() > -4) {
+  if(low.spannung() > -3.2) {
     Serial.println("Diode check failed");
     return true;
   } else {
@@ -215,26 +231,26 @@ void update() {
     } else {
       enc = read_encoder();
     }
-    ladeleistung = ladeleistungen[enc];
+    set_ladeleistung(ladeleistungen[enc]);
     return;
   }
 
   // serial data valid
   if(serial_input.force_auto) {
     automatik = true;
+    delay(100); // FIXME: nicht schön!
     pinMode(AUTOMATIK, OUTPUT);
     digitalWrite(AUTOMATIK, LOW);
-    delay(200); // FIXME: nicht schön!
   }
 
   // manual mode
   if(!automatik) {
     enc = read_encoder();
-    ladeleistung = ladeleistungen[enc];
+    set_ladeleistung(ladeleistungen[enc]);
     return;
   }
 
-  ladeleistung = serial_input.wert;
+  set_ladeleistung(serial_input.wert);
   enc = calc_encoder(ladeleistung);
 }
 
@@ -267,7 +283,7 @@ int16_t pegel::mittelwert() {
 
 float adc2float(uint16_t val) {
   int a = val;
-  return (a - 350) / 50;
+  return float((a - 350) / 50.0);
 }
 
 float pegel::spannung() { 
@@ -278,10 +294,10 @@ float pegel::spannung() {
     wert = analogRead(CPRead);
   }
 
-  if(wert == 0) {
-    dbgln("Measurement error!");
-    error.set();
-    return 0;
-  }
+  // if(wert == 0) {
+  //   dbgln("Measurement error!");
+  //   error.set();
+  //   return 0;
+  // }
   return adc2float(wert);
 }

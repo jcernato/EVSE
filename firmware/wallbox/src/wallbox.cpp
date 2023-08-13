@@ -25,10 +25,10 @@ void loop() {
   // Messen
   if(pwm_active) {
     INTERRUPTS_ON;
-    delay(20);
+    delay(50);
     INTERRUPTS_OFF;
   } else {
-    delay(20);
+    delay(50);
   }
 
   read_serial();

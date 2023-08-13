@@ -12,4 +12,4 @@ struct _serial_input {
   uint16_t wert = 0;
   unsigned long timestamp = 0;
 };
-static _serial_input serial_input;
+extern _serial_input serial_input;

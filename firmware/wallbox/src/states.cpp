@@ -23,7 +23,7 @@ void _off::set_individual() {
 // ################## OFF ################# //
 // ################## RUN ################# //
 void _off::run() {
-   update();
+    update();
     toggle_LED(enc);
     if(enc == 0) {
       return;
