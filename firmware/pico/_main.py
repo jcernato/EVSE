@@ -3,7 +3,7 @@ import uasyncio as asyncio
 import struct
 from umqtt import MQTTClient
 import network
-from machine import UART, Pin
+from machine import UART, Pin, reset, WDT
 import json
 
 indicator = Pin("LED", Pin.OUT)
@@ -33,7 +33,7 @@ while not wlan.isconnected():
         wlan.connect(SSID, PSK)
     if i == 50:
         print(" reset")
-        machine.reset()
+        reset()
     i += 1
 
 print("Wlan ready")
@@ -53,17 +53,20 @@ class wallbox:
 
     def read_serial(self):
         if self.serial.any():
+            # wait - allow transfer to complete
+            time.sleep_ms(50)
             data = self.serial.read(1)
-            time.sleep_ms(10)
             if not data == b'$':
+                # dbg message
                 try:
-                    data += self.serial.readline()
+                    data += self.serial.readline() # type: ignore
                     print(data.decode(), end='')
                 except:
-                    print("error0")
+                    print("encoding error")
                     print(data)
                 return None
             else:
+                # data package
                 print("Packet received")
                 if not self.serial.any() >= 14:
                     print("string too short")
@@ -71,45 +74,34 @@ class wallbox:
                 try:
                     data += self.serial.read(14)
                 except:
-                    print("error1")
+                    print("encoding error2")
                     print(data)
-                # while True:
-                #     byte = self.serial.read(1)
-                #     if byte == b'#':
-                #         break
-                #     else:
-                #         try:
-                #             data += byte
-                #         except TypeError:
-                #             print("type error", type(byte), byte)
-                #             return None
-                if self.serial.any(): self.serial.read(self.serial.any())
-                return data
 
-wb = wallbox()
-def decode(data: bytes):
-    print("command: " + chr(data[0]))
-    print("state: " + chr(data[1]))
-    print("mode: " + chr(data[2]))
-    print("pwm active: " + str(data[3]==1))
-    print("leistung: " + str((data[4] << 8) + data[5]))
-    print("high pegel: %.2f" %(struct.unpack('f', data[6:10])))
-    print("low pegel: %.2f" %(struct.unpack('f', data[10:14])))
+                # flush rx buffer
+                if self.serial.any(): self.serial.read(self.serial.any())
+
+                return data
+        
+    def decode(self, data: bytes):
+        msg = {
+            "state": chr(data[1]),
+            "mode": chr(data[2]),
+            "pwm_active": str(data[3]==1),
+            "leistung:": (data[4] << 8) + data[5],
+            "cp_high": struct.unpack('f', data[6:10]),
+            "cp_low": struct.unpack('f', data[10:14])
+        }
+        return msg
+
 
 def send_mqtt(data: bytes):
-    msg = {
-        "state": chr(data[1]),
-        "mode": chr(data[2]),
-        "pwm_active": str(data[3]==1),
-        "leistung:": (data[4] << 8) + data[5],
-        "cp_high": struct.unpack('f', data[6:10]),
-        "cp_low": struct.unpack('f', data[10:14])
-    }
+    msg = wb.decode(data)
     j=json.dumps(msg)
     try:
         c.publish(TOPIC_SEND, j.encode())
     except:
         print("mqtt send failed")
+
 
 async def read():
     print("read initialzied")
@@ -123,23 +115,9 @@ async def read():
                     print("Error checksum: ", end=' ')
                     print(data)
                 else:
-                    # decode(data)
                     send_mqtt(data)
             except:
                 print("Data corrupt")
-
-
-async def main():
-    print("main")
-    n=0
-    asyncio.create_task(read())
-    while True:
-        await asyncio.sleep_ms(300)
-        c.check_msg()
-        # print("n: " + str(n))
-        # wb.send_wallbox(b'S', n)
-        # n += 1
-
 
 def sub_cb(topic, msg):
     print((topic, msg))
@@ -157,7 +135,15 @@ def sub_cb(topic, msg):
     elif command == 'force':
         wb.send_wallbox(b'F', leistung)
 
-
+wdt = WDT(timeout=5000)
+wb = wallbox()
+async def main():
+    print("main")
+    asyncio.create_task(read())
+    while True:
+        await asyncio.sleep_ms(300)
+        c.check_msg()
+        wdt.feed()
 
 # c = MQTTClient("wallbox", '10.0.0.1', user='solar', password='fronius!')
 c = MQTTClient("wallbox", '10.0.0.22')
