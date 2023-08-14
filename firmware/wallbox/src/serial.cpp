@@ -59,7 +59,7 @@ void read_serial() {
   if(!Serial.available()) {
     return;
   }
-  delay(20);
+  delay(50);
   while(Serial.available()) {
     char c = Serial.read();
     input_string[index++] = c;

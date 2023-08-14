@@ -224,34 +224,23 @@ void update() {
     automatik = false;
   }
 
-  // if serial data is outdated
-  if(millis() - serial_input.timestamp > 300000 || serial_input.timestamp == 0) {
+  // serial data is valid
+  if(millis() - serial_input.timestamp < 300000 && serial_input.timestamp != 0) {
+    if(serial_input.force_auto) automatik = true;
     if(automatik) {
-      enc = 0;
-    } else {
-      enc = read_encoder();
+      ALL_LEDs_OFF();
+      delay(100);
+      pinMode(AUTOMATIK, OUTPUT);
+      digitalWrite(AUTOMATIK, LOW);
+      set_ladeleistung(serial_input.wert);
+      enc = calc_encoder(ladeleistung);
+      return;
     }
-    set_ladeleistung(ladeleistungen[enc]);
-    return;
   }
 
-  // serial data valid
-  if(serial_input.force_auto) {
-    automatik = true;
-    delay(100); // FIXME: nicht schön!
-    pinMode(AUTOMATIK, OUTPUT);
-    digitalWrite(AUTOMATIK, LOW);
-  }
-
-  // manual mode
-  if(!automatik) {
-    enc = read_encoder();
-    set_ladeleistung(ladeleistungen[enc]);
-    return;
-  }
-
-  set_ladeleistung(serial_input.wert);
-  enc = calc_encoder(ladeleistung);
+  enc = read_encoder();
+  set_ladeleistung(ladeleistungen[enc]);
+  return;
 }
 
 
