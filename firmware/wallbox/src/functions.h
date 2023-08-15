@@ -18,6 +18,7 @@ extern byte enc;
 extern uint16_t ladeleistung;
 extern bool automatik;
 extern bool pwm_active;
+extern byte error_code;
 static uint16_t ladeleistungen[8] = {0, 1200, 1600, 2000, 2400, 2800, 3200, 3400};
 static byte LEDs[] = {LED12, LED16, LED20, LED24, LED28, LED32, LED36};
 
@@ -37,7 +38,7 @@ void ALL_LEDs_OFF(void);
 float adc2float(uint16_t val);
 void set_ladeleistung(uint16_t val);
 
-#define DIODE_CHECK if(diode_fail()) { error.set(); return; }
+#define DIODE_CHECK if(diode_fail()) { error_code = 2; error.set(); return; }
 
 #define INTERRUPTS_ON TCA0_SPLIT_INTCTRL = 0b00010001
 #define INTERRUPTS_OFF TCA0_SPLIT_INTCTRL = 0b00000000

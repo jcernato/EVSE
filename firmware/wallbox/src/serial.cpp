@@ -4,7 +4,7 @@ static char input_string[RX_BUFFSIZE];
 _serial_input serial_input;
 
 void send_status() {
-  char msg[16];
+  char msg[20];
   char magic = '$';
   char autom, cs;
   if(automatik) autom = 'A';
@@ -24,33 +24,14 @@ void send_status() {
   for(byte i = 0; i < 4; i++) msg[i+6] = fl.bytes[i];
   fl.wert = low.spannung();
   for(byte i = 0; i < 4; i++) msg[i+10] = fl.bytes[i];
+  msg[14] = error_code;
   unsigned int sum = 0;
-  for(byte i = 0; i < 14; i++) sum = sum + msg[i];
+  for(byte i = 0; i < 15; i++) sum = sum + msg[i];
   cs = sum & 0xff;
-  msg[14] = cs;
-  msg[15] = '#';
-  for(byte i = 0; i < 16; i++) Serial.print(msg[i]);
+  msg[15] = cs;
+  msg[16] = '#';
+  for(byte i = 0; i < 17; i++) Serial.print(msg[i]);
   Serial.flush();
-  delay(50);
-}
-
-void send_verbose() {
-  union {
-    float wert;
-    byte bytes[4];
-  } fl;
-  float a = -1.234;
-  float b = adc2float(500);
-  float c = adc2float(123);
-  fl.wert = a;
-  for(byte i=0; i<4; i++) Serial.print(fl.bytes[i], HEX);
-  Serial.println();
-  fl.wert = b;
-  for(byte i=0; i<4; i++) Serial.print(fl.bytes[i], HEX);
-  Serial.println();
-  fl.wert = c;
-  for(byte i=0; i<4; i++) Serial.print(fl.bytes[i], HEX);
-  Serial.println();
   delay(50);
 }
 
@@ -94,11 +75,8 @@ void read_serial() {
       send_status();
       return;
     }
-    // case 'V': {
-    //   send_verbose();
-    //   return;
-    // }
     case 'R': {
+      Serial.println("OK");
       dbgln("Reset");
       delay(2500); //resetFun();
     }
@@ -115,4 +93,5 @@ void read_serial() {
     Serial.println("WB: Out of range [1000 - 3600]");
     serial_input.timestamp = 0;
   }
+  Serial.println("OK");
 }

@@ -36,6 +36,7 @@ void loop() {
 
   if(digitalRead(RESET) == 0) {
     dbgln("Manual error injecton");
+    error_code = 1;
     error.set();
     while(digitalRead(RESET) == 0) delay(50);
   }

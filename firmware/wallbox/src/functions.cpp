@@ -8,6 +8,7 @@ uint16_t ladeleistung = 0;
 bool automatik = 0;
 bool pwm_active = 0;
 pegel high, low;
+byte error_code = 0;
 
 ISR(TCA0_LCMP0_vect) {
   delayMicroseconds(50); // Warte bis Spannung stabil (hohe input Widerstände + Inputkapazität -> Ladekurve)
@@ -72,6 +73,7 @@ void ALL_LEDs_OFF(void) {
 void toggle_LED(byte index) {
     if(index < 0 || index > 7) {
         Serial.print("Encoder ERROR");
+        error_code = 4;
         error.set();
         return;
     }
@@ -148,6 +150,7 @@ void set_pwm(uint16_t leistung) {
     return;
   } else if (leistung < 1000 || leistung > 3600) {
     Serial.println("PWM value error!");
+    error_code = 5;
     error.set();
     return;
   }
@@ -192,20 +195,30 @@ void init_splash() {
 
   dbgln("DEBUG MODE");
   dbgln("Wallbox:");
-  dbgln("Befehlsstruktur: MagicNumber (Byte0), Payload(Byte 1&2), Checksum(Byte3)");
+  dbgln("Befehlsstruktur: MagicNumber/Command (Byte0), Payload(Byte 1&2), Checksum(Byte3)");
   dbgln("Checksum: (byte0 + byte1 + byte2) & 0xff");
   dbgln("Mögliche Befehle:");
   dbgln("'L': setze Ladeleistung für Automatik");
   dbgln("'F': Force -> erzwinge Automatik modus ");
   dbgln("'S': Statusanforderung");
-  dbgln("     Antwort: 4 bytes:");
+  dbgln("     Antwort: 14 bytes:");
   dbgln("     Byte 0: 'S'");
   dbgln("     Byte 1: Wallboxstatus nach SAE_J1772 (A-E)");
   dbgln("     Byte 2: Modus (M...Manell, A...Automatik)");
-  dbgln("     Byte 3 + 4: Ladeleistung");
-  dbgln("     Byte 5: Checksum");
-  dbgln("'V': Verbose - Statusname + gemessene Spannungen (CP)");
+  dbgln("     Byte 3: pwm-active");
+  dbgln("     Byte 4 + 5: Ladeleistung");
+  dbgln("     Byte 6 - 9: Spannung level high (Control Pilot)");
+  dbgln("     Byte 10 - 13: Spannung level high (Control Pilot)");
+  dbgln("     Byte 14: Checksum");
+  dbgln("     Byte 15: Endmarker '#'");
   dbgln("'R': Reset");
+  dbgln("Error codes:");
+  dbgln("0: no error");
+  dbgln("1: manual error injection");
+  dbgln("2: Diode fail");
+  dbgln("3: Measurement error");
+  dbgln("4: Encoder error");
+  dbgln("5: Set-PWM value error");
 
   for(byte i = 0; i < sizeof(LEDs); i++) {
     digitalWrite(LEDs[i], LOW);
@@ -260,6 +273,7 @@ int16_t pegel::mittelwert() {
       return old_value;
     } else {
       dbgln("Error measurement error_count");
+      error_code = 3;
       error.set();
       return 0;
     }
@@ -283,10 +297,5 @@ float pegel::spannung() {
     wert = analogRead(CPRead);
   }
 
-  // if(wert == 0) {
-  //   dbgln("Measurement error!");
-  //   error.set();
-  //   return 0;
-  // }
   return adc2float(wert);
 }

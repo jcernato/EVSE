@@ -152,6 +152,7 @@ void _error::set_individual() {
 void _error::run() {
   if(digitalRead(RESET) == 0) {
     Serial.println("Error cleared");
+    error_code = 0;
     standby.set();
   }
 }

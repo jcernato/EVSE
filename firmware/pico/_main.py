@@ -68,11 +68,11 @@ class wallbox:
             else:
                 # data package
                 print("Packet received")
-                if not self.serial.any() >= 14:
+                if not self.serial.any() >= 15:
                     print("string too short")
                     print(self.serial.read(self.serial.any()))
                 try:
-                    data += self.serial.read(14)
+                    data += self.serial.read(15)
                 except:
                     print("encoding error2")
                     print(data)
@@ -89,7 +89,8 @@ class wallbox:
             "pwm_active": str(data[3]==1),
             "leistung:": (data[4] << 8) + data[5],
             "cp_high": struct.unpack('f', data[6:10]),
-            "cp_low": struct.unpack('f', data[10:14])
+            "cp_low": struct.unpack('f', data[10:14]),
+            "error": data[14]
         }
         return msg
 
@@ -110,8 +111,8 @@ async def read():
         data = wb.read_serial() 
         if not data == None:
             try:
-                cs = sum(data[:14]) & 0xff
-                if not cs == data[14]:
+                cs = sum(data[:15]) & 0xff
+                if not cs == data[15]:
                     print("Error checksum: ", end=' ')
                     print(data)
                 else:
@@ -125,6 +126,9 @@ def sub_cb(topic, msg):
     command = data["command"]
     if command == 'get':
         wb.send_wallbox(b'S')
+        return
+    elif command == 'reset':
+        wb.send_wallbox(b'R')
         return
     leistung = data["power"]
     if leistung < 0 or leistung > 3600:
