@@ -1,4 +1,4 @@
-from machine import UART
+from machine import UART, Pin
 from time import sleep_ms, ticks_ms
 from struct import unpack
 import json
@@ -7,7 +7,7 @@ class Wallbox:
     serial: UART
     send_request: bool = False
     repaint: bool
-    TOPIC_RECEIVE = b'tele/wallbox/set'
+    TOPIC_RECEIVE = b'cmnd/wallbox/'
     TOPIC_SEND = b'tele/wallbox/state'
     data = {}
 
@@ -87,3 +87,31 @@ class Wallbox:
             self.send(b'L', leistung)
         elif command == 'force':
             self.send(b'F', leistung)
+        else:
+            print("Unknown command")
+
+class Counter:
+    TOPIC_RECEIVE = b'cmnd/S0/'
+    TOPIC_SEND = b'tele/S0/state'
+    def __init__(self):
+        self.S0 = Pin(21, Pin.IN, Pin.PULL_UP)
+        self.S0.irq(trigger=Pin.IRQ_RISING, handler=self.increment)
+        self.Led = Pin(6, Pin.OUT)
+        self.data = { "count": 0 }
+        self.send_request = False
+
+    def increment(self, pin):
+        self.data["count"] += 1
+        print(self.data["count"])
+        self.Led.toggle()
+
+    def parse_mqtt(self, msg):
+        data = json.loads(msg.decode())
+        command = data["command"]
+        count = data["count"]
+        if command == 'set':
+            self.data["count"] = count
+        elif command == 'get':
+            self.send_request = True
+        else:
+            print("Unknown command")

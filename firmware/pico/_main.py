@@ -1,18 +1,19 @@
 import uasyncio as asyncio
 from verbindung import *
-from wallbox import Wallbox
+from wallbox import Wallbox, Counter
 from machine import UART, Pin, WDT
 
 print("Wallbox MQTT Gateway")
 
 uart = UART(0, 9600, rx=Pin(17), tx=Pin(16))
 wb = Wallbox()
+s0 = Counter()
 wb.serial = uart
 
 print("Subscription topic: " + wb.TOPIC_RECEIVE.decode())
 print("Publication topic: " + wb.TOPIC_SEND.decode())
 
-d=[wb]
+d=[wb, s0]
 network = Verbindung(d)
 
 async def read_serial_wallbox():
