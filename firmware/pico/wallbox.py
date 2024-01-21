@@ -7,9 +7,9 @@ class Wallbox:
     serial: UART
     send_request: bool = False
     repaint: bool
-    TOPIC_RECEIVE = b'cmnd/wallbox/'
+    TOPIC_RECEIVE = b'cmd/wallbox'
     TOPIC_SEND = b'tele/wallbox/state'
-    data = {}
+    data = {"state": "no data available"}
 
     def send(self, cmd: bytes, value: int = 0):
         # send magic number + value in 2 bytes + checksum
@@ -91,7 +91,7 @@ class Wallbox:
             print("Unknown command")
 
 class Counter:
-    TOPIC_RECEIVE = b'cmnd/S0/'
+    TOPIC_RECEIVE = b'cmd/S0'
     TOPIC_SEND = b'tele/S0/state'
     def __init__(self):
         self.S0 = Pin(21, Pin.IN, Pin.PULL_UP)
