@@ -1,5 +1,5 @@
 #pragma once
-#include "functions.h"
+#include "functions.hpp"
 
 void(* resetFunc) (void) = 0;
 bool DEBUG = false;

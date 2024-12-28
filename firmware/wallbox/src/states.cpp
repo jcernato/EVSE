@@ -1,4 +1,4 @@
-#include "states.h"
+#include "states.hpp"
 
 static state *machine_state;
 

@@ -1,9 +1,9 @@
 #pragma once
 
 #include <Arduino.h>
-#include "states.h"
-#include "pinconfig.h"
-#include "serial.h"
+#include "states.hpp"
+#include "pinconfig.hpp"
+#include "serial.hpp"
 
 #define PWM_LPER 158 // set counter reset to 158 => change PWM Frequency from 617 to 1000 Hz
 // default voltage levels

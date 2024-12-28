@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
-#include "functions.h"
+#include "functions.hpp"
 
 // ======================================== //
 // ============== STATE CLASS ============= //

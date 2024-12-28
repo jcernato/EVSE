@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <avr/wdt.h>
-#include "functions.h"
+#include "functions.hpp"
 
 
 void setup() {

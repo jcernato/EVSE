@@ -1,4 +1,4 @@
-#include "serial.h"
+#include "serial.hpp"
 
 static char input_string[RX_BUFFSIZE];
 _serial_input serial_input;
